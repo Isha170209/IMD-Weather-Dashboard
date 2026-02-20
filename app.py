@@ -6,7 +6,28 @@ from topojson import Topology
 import plotly.express as px
 
 st.set_page_config(layout="wide")
-st.title("IMD Weather Dashboard")
+
+# ------------------------------------------------
+# HEADER (IMD STYLE)
+# ------------------------------------------------
+
+st.markdown("""
+    <div style="
+        background-color: #E31F26;
+        padding: 18px;
+    ">
+        <h1 style="
+            color: white;
+            text-align: center;
+            margin: 0;
+            font-weight: 600;
+        ">
+            IMD Weather Dashboard
+        </h1>
+    </div>
+""", unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ------------------------------------------------
 # CACHE: LOAD TOPOJSON AND CONVERT TO GEOJSON
@@ -19,7 +40,7 @@ def load_boundary():
 
     geojson = Topology(topo).to_geojson()
 
-    # Convert all GeoJSON properties to lowercase
+    # Normalize property names to lowercase
     for feature in geojson["features"]:
         feature["properties"] = {
             k.lower(): v for k, v in feature["properties"].items()
@@ -29,14 +50,14 @@ def load_boundary():
 
 
 # ------------------------------------------------
-# CACHE: LOAD ALL PARQUET FILES FROM FOLDER
+# CACHE: LOAD PARQUET FILES
 # ------------------------------------------------
 
 @st.cache_data
 def load_all_parquet(folder_path):
     files = [f for f in os.listdir(folder_path) if f.endswith(".parquet")]
 
-    if len(files) == 0:
+    if not files:
         return None
 
     df_list = []
@@ -46,137 +67,149 @@ def load_all_parquet(folder_path):
 
     df = pd.concat(df_list, ignore_index=True)
 
-    # Convert all column names to lowercase
+    # Normalize column names
     df.columns = df.columns.str.lower()
 
     return df
 
 
 # ------------------------------------------------
-# PARAMETER SELECTION
+# LAYOUT
 # ------------------------------------------------
 
-parameter = st.selectbox("Select Parameter", ["rainfall", "tmin", "tmax"])
-folder_path = f"data/{parameter}"
-
-if not os.path.exists(folder_path):
-    st.error("Data folder not found.")
-    st.stop()
-
-df = load_all_parquet(folder_path)
-
-if df is None:
-    st.error("No parquet files found in selected parameter folder.")
-    st.stop()
+left_panel, map_panel = st.columns([1, 3])
 
 # ------------------------------------------------
-# ENSURE REQUIRED COLUMNS EXIST
+# FILTER PANEL
 # ------------------------------------------------
 
-required_columns = ["date", "state", "district", "tehsil"]
+with left_panel:
 
-missing = [col for col in required_columns if col not in df.columns]
+    st.markdown("### Filters")
 
-if missing:
-    st.error(f"Missing required columns: {missing}")
-    st.write("Available columns:", df.columns)
-    st.stop()
+    parameter = st.selectbox("Parameter", ["rain", "tmax", "tmin"])
+    folder_path = f"data/{parameter}"
 
-# Ensure date format
-df["date"] = pd.to_datetime(df["date"])
+    if not os.path.exists(folder_path):
+        st.error("Data folder not found.")
+        st.stop()
 
-# ------------------------------------------------
-# DATE PICKER
-# ------------------------------------------------
+    df = load_all_parquet(folder_path)
 
-min_date = df["date"].min()
-max_date = df["date"].max()
+    if df is None:
+        st.error("No parquet files found.")
+        st.stop()
 
-selected_date = st.date_input(
-    "Select Date",
-    value=min_date,
-    min_value=min_date,
-    max_value=max_date
-)
+    # Required columns
+    required_cols = ["date", "state", "district", "tehsil"]
+    missing = [col for col in required_cols if col not in df.columns]
 
-df_date = df[df["date"] == pd.to_datetime(selected_date)]
+    if missing:
+        st.error(f"Missing required columns: {missing}")
+        st.stop()
 
-if df_date.empty:
-    st.warning("No data available for selected date.")
-    st.stop()
+    df["date"] = pd.to_datetime(df["date"])
 
-# ------------------------------------------------
-# LOCATION FILTERING
-# ------------------------------------------------
+    # STATE
+    state = st.selectbox(
+        "State",
+        sorted(df["state"].dropna().unique())
+    )
 
-state = st.selectbox(
-    "Select State",
-    sorted(df_date["state"].dropna().unique())
-)
+    df_state = df[df["state"] == state]
 
-df_state = df_date[df_date["state"] == state]
+    # DISTRICT
+    district = st.selectbox(
+        "District",
+        sorted(df_state["district"].dropna().unique())
+    )
 
-district = st.selectbox(
-    "Select District",
-    sorted(df_state["district"].dropna().unique())
-)
+    df_district = df_state[df_state["district"] == district]
 
-df_district = df_state[df_state["district"] == district]
+    # TEHSIL
+    tehsil = st.selectbox(
+        "Tehsil",
+        sorted(df_district["tehsil"].dropna().unique())
+    )
 
-tehsil = st.selectbox(
-    "Select Tehsil",
-    sorted(df_district["tehsil"].dropna().unique())
-)
+    df_tehsil = df_district[df_district["tehsil"] == tehsil]
 
-df_tehsil = df_district[df_district["tehsil"] == tehsil]
+    # DATE RANGE
+    min_date = df["date"].min()
+    max_date = df["date"].max()
 
-# ------------------------------------------------
-# SHOW FILTERED TABLE
-# ------------------------------------------------
+    start_date = st.date_input(
+        "Start Date",
+        min_value=min_date,
+        max_value=max_date,
+        value=min_date
+    )
 
-st.subheader("Filtered Data")
-st.dataframe(df_tehsil)
+    end_date = st.date_input(
+        "End Date",
+        min_value=min_date,
+        max_value=max_date,
+        value=max_date
+    )
 
-# ------------------------------------------------
-# DETECT VALUE COLUMN AUTOMATICALLY
-# ------------------------------------------------
+    col1, col2 = st.columns(2)
+    confirm = col1.button("Confirm")
+    reset = col2.button("Reset")
 
-non_value_cols = ["date", "lon", "lat", "state", "district", "tehsil"]
-value_columns = [col for col in df.columns if col not in non_value_cols]
+    if reset:
+        st.experimental_rerun()
 
-if len(value_columns) == 0:
-    st.error("No climate value column found.")
-    st.stop()
-
-value_column = value_columns[0]
-
-# ------------------------------------------------
-# AGGREGATE FOR MAP (TEHSIL LEVEL)
-# ------------------------------------------------
-
-agg = df_date.groupby("tehsil")[value_column].mean().reset_index()
 
 # ------------------------------------------------
-# LOAD BOUNDARY
+# MAP PANEL
 # ------------------------------------------------
 
-geojson = load_boundary()
+with map_panel:
 
-# ------------------------------------------------
-# CHOROPLETH MAP
-# ------------------------------------------------
+    if confirm:
 
-st.subheader("Tehsil Level Map")
+        df_filtered = df_tehsil[
+            (df_tehsil["date"] >= pd.to_datetime(start_date)) &
+            (df_tehsil["date"] <= pd.to_datetime(end_date))
+        ]
 
-fig = px.choropleth(
-    agg,
-    geojson=geojson,
-    featureidkey="properties.tehsil",
-    locations="tehsil",
-    color=value_column,
-    projection="mercator"
-)
+        if df_filtered.empty:
+            st.warning("No data available for selected filters.")
+            st.stop()
 
-fig.update_geos(fitbounds="locations", visible=False)
+        # Identify climate value column
+        non_value_cols = ["date", "lat", "lon", "state", "district", "tehsil"]
+        value_columns = [col for col in df.columns if col not in non_value_cols]
 
-st.plotly_chart(fig, use_container_width=True)
+        if not value_columns:
+            st.error("No climate value column found.")
+            st.stop()
+
+        value_column = value_columns[0]
+
+        # Aggregate by tehsil
+        agg = df_filtered.groupby("tehsil")[value_column].mean().reset_index()
+
+        geojson = load_boundary()
+
+        # Choropleth with basemap
+        fig = px.choropleth_mapbox(
+            agg,
+            geojson=geojson,
+            locations="tehsil",
+            featureidkey="properties.tehsil",
+            color=value_column,
+            mapbox_style="carto-positron",
+            zoom=5,
+            center={"lat": 22.5, "lon": 80},
+            opacity=0.75
+        )
+
+        fig.update_layout(
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    else:
+        st.info("Select filters and click Confirm to display the map.")
