@@ -6,7 +6,7 @@ from topojson import Topology
 import plotly.express as px
 
 st.set_page_config(layout="wide")
-st.title("IMD Climate Dashboard")
+st.title("IMD Weather Dashboard")
 
 # ------------------------------------------------
 # CACHE: LOAD TOPOJSON AND CONVERT TO GEOJSON
