@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 
 st.set_page_config(layout="wide")
-st.title("IMD Weather Data Dashboard")
+st.title("Weather Data Dashboard")
 
 # ================= GRID CONFIG =================
 GRID_CONFIG = {
