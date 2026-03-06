@@ -9,9 +9,6 @@ from scipy.spatial import cKDTree
 st.set_page_config(layout="wide")
 st.title("Weather Data Dashboard")
 
-# ================= MAX YEARS LIMIT =================
-MAX_YEARS = 5
-
 # ================= GRID CONFIG =================
 GRID_CONFIG = {
     "rain": {
@@ -52,13 +49,16 @@ if "lat" not in st.session_state:
 if "lon" not in st.session_state:
     st.session_state.lon = ""
 
-if "date" not in st.session_state:
-    st.session_state.date = None
+if "start_date" not in st.session_state:
+    st.session_state.start_date = None
+
+if "end_date" not in st.session_state:
+    st.session_state.end_date = None
 
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
-# ================= PARAMETER =================
+
 parameter = st.sidebar.selectbox(
     "Select Parameter",
     ["rain", "tmax", "tmin"],
@@ -67,7 +67,6 @@ parameter = st.sidebar.selectbox(
 
 config = GRID_CONFIG[parameter]
 
-# ================= DATA FILES =================
 data_folder = os.path.join("data", parameter)
 parquet_files = glob.glob(os.path.join(data_folder, "*.parquet"))
 
@@ -77,22 +76,24 @@ if not parquet_files:
 
 years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-# ================= MULTI YEAR SELECT =================
+# ===== MULTI YEAR SELECTION =====
 selected_years = st.sidebar.multiselect(
-    f"Select Years (max {MAX_YEARS})",
+    "Select Years (max 5)",
     years,
     default=st.session_state.years
 )
 
+MAX_YEARS = 5
+
 if len(selected_years) > MAX_YEARS:
-    st.sidebar.error(f"You can select maximum {MAX_YEARS} years.")
+    st.sidebar.error(f"Select maximum {MAX_YEARS} years only.")
     st.stop()
 
 # ================= LOAD DATA =================
 @st.cache_data
-def load_year_data(parameter, years):
+def load_years_data(parameter, years):
 
-    dfs = []
+    all_df = []
 
     for year in years:
 
@@ -104,17 +105,15 @@ def load_year_data(parameter, years):
         df["lat"] = pd.to_numeric(df["lat"])
         df["lon"] = pd.to_numeric(df["lon"])
 
-        dfs.append(df)
+        all_df.append(df)
 
-    final_df = pd.concat(dfs, ignore_index=True)
-
-    return final_df
+    return pd.concat(all_df, ignore_index=True)
 
 
 if selected_years:
-    df = load_year_data(parameter, selected_years)
+    df = load_years_data(parameter, selected_years)
 else:
-    st.warning("Please select at least one year.")
+    st.info("Please select at least one year.")
     st.stop()
 
 # ================= BUILD KD TREE =================
@@ -128,13 +127,20 @@ def build_kdtree(dataframe):
 
 tree, grid_points = build_kdtree(df)
 
-# ================= DATE PICKER =================
+# ================= DATE RANGE =================
 min_date = df["date"].min()
 max_date = df["date"].max()
 
-selected_date = st.sidebar.date_input(
-    "Select Date",
-    value=st.session_state.date or min_date,
+start_date = st.sidebar.date_input(
+    "Start Date",
+    value=st.session_state.start_date or min_date,
+    min_value=min_date,
+    max_value=max_date
+)
+
+end_date = st.sidebar.date_input(
+    "End Date",
+    value=st.session_state.end_date or max_date,
     min_value=min_date,
     max_value=max_date
 )
@@ -148,21 +154,27 @@ submit_button = st.sidebar.button("Submit")
 reset_button = st.sidebar.button("Reset")
 
 if reset_button:
+
     st.session_state.lat = ""
     st.session_state.lon = ""
-    st.session_state.date = None
+    st.session_state.start_date = None
+    st.session_state.end_date = None
     st.session_state.parameter = "rain"
     st.session_state.years = []
     st.session_state.submitted = False
+
     st.experimental_rerun()
 
 if submit_button:
+
     st.session_state.lat = lat_input
     st.session_state.lon = lon_input
-    st.session_state.date = selected_date
+    st.session_state.start_date = start_date
+    st.session_state.end_date = end_date
     st.session_state.parameter = parameter
     st.session_state.years = selected_years
     st.session_state.submitted = True
+
 
 # ================= MAIN LOGIC =================
 if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
@@ -172,6 +184,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         lat_val = float(st.session_state.lat)
         lon_val = float(st.session_state.lon)
 
+        # ===== Bounds Check =====
         if not (config["lat_min"] <= lat_val <= config["lat_max"]):
             st.error("Latitude outside IMD bounds.")
             st.stop()
@@ -180,20 +193,15 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.error("Longitude outside IMD bounds.")
             st.stop()
 
-        selected_date = pd.to_datetime(st.session_state.date)
-
-        date_filtered = df[df["date"] == selected_date]
-
-        if date_filtered.empty:
-            st.warning("No data for selected date.")
-            st.stop()
+        start_date = pd.to_datetime(st.session_state.start_date)
+        end_date = pd.to_datetime(st.session_state.end_date)
 
         epsilon = 1e-6
 
-        # ===== EXACT GRID =====
-        exact_row = date_filtered[
-            (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
-            (np.abs(date_filtered["lon"] - lon_val) < epsilon)
+        # ===== EXACT GRID CHECK =====
+        exact_row = df[
+            (np.abs(df["lat"] - lat_val) < epsilon) &
+            (np.abs(df["lon"] - lon_val) < epsilon)
         ]
 
         if not exact_row.empty:
@@ -201,7 +209,6 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             grid_status = "Exact Grid Point Found"
             grid_lat = lat_val
             grid_lon = lon_val
-            row = exact_row
 
         else:
 
@@ -209,18 +216,17 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
             grid_lat, grid_lon = grid_points[idx]
 
-            row = date_filtered[
-                (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
-                (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
-            ]
-
-            if row.empty:
-                st.error("Nearest grid not found.")
-                st.stop()
-
             grid_status = "Nearest Grid Found"
 
-        value = row.iloc[0][parameter]
+
+        # ===== DATE FILTER =====
+        all_data = df[
+            (np.abs(df["lat"] - grid_lat) < epsilon) &
+            (np.abs(df["lon"] - grid_lon) < epsilon) &
+            (df["date"] >= start_date) &
+            (df["date"] <= end_date)
+        ].sort_values("date")
+
 
         # ================= TABS =================
         tabs = st.tabs(["Description", "Tabular", "Graphical"])
@@ -242,9 +248,9 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
                 st.write("Grid Longitude Used:", grid_lon)
 
             with col2:
-                st.write("Date:", selected_date.date())
+                st.write("Start Date:", start_date.date())
+                st.write("End Date:", end_date.date())
                 st.write("Resolution:", f"{config['resolution']}°")
-                st.write("Value:", value)
 
         # ================= TABULAR =================
         with tabs[1]:
@@ -254,13 +260,8 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.write(f"Entered Location: ({lat_val}, {lon_val})")
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
 
-            all_data = df[
-                (np.abs(df["lat"] - grid_lat) < epsilon) &
-                (np.abs(df["lon"] - grid_lon) < epsilon)
-            ].sort_values("date")
-
             if all_data.empty:
-                st.warning("No historical data.")
+                st.warning("No data in selected date range.")
             else:
 
                 st.dataframe(all_data)
@@ -283,7 +284,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
 
             if all_data.empty:
-                st.warning("No historical data.")
+                st.warning("No data in selected date range.")
             else:
 
                 fig, ax = plt.subplots(figsize=(10,4))
