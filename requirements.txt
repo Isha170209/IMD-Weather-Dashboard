@@ -8,3 +8,5 @@ plotly
 topojson
 matplotlib
 scipy
+streamlit-folium
+folium
