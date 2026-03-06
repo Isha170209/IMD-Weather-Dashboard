@@ -72,6 +72,7 @@ selected_year = st.sidebar.selectbox(
     index=years.index(st.session_state.year) if st.session_state.year in years else 0
 )
 
+# ================= LOAD DATA =================
 @st.cache_data
 def load_year_data(parameter, year):
     file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
@@ -83,6 +84,7 @@ def load_year_data(parameter, year):
 
 df = load_year_data(parameter, selected_year)
 
+# ================= DATE PICKER =================
 min_date = df["date"].min()
 max_date = df["date"].max()
 
@@ -93,9 +95,11 @@ selected_date = st.sidebar.date_input(
     max_value=max_date
 )
 
+# ================= LAT LON INPUT =================
 lat_input = st.sidebar.text_input("Enter Latitude", st.session_state.lat)
 lon_input = st.sidebar.text_input("Enter Longitude", st.session_state.lon)
 
+# ================= BUTTONS =================
 submit_button = st.sidebar.button("Submit")
 reset_button = st.sidebar.button("Reset")
 
@@ -123,6 +127,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         lat_val = float(st.session_state.lat)
         lon_val = float(st.session_state.lon)
 
+        # ===== Bounds Check =====
         if not (config["lat_min"] <= lat_val <= config["lat_max"]):
             st.error("Latitude outside IMD bounds.")
             st.stop()
@@ -140,6 +145,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         epsilon = 1e-6
 
+        # ===== EXACT GRID CHECK =====
         exact_row = date_filtered[
             (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
             (np.abs(date_filtered["lon"] - lon_val) < epsilon)
@@ -154,6 +160,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         else:
 
+            # ===== NEAREST GRID CALCULATION =====
             res = config["resolution"]
             lat_min = config["lat_min"]
             lon_min = config["lon_min"]
@@ -176,6 +183,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         value = row.iloc[0][parameter]
 
+        # ================= TABS =================
         tabs = st.tabs(["Description", "Tabular", "Graphical"])
 
         # ================= DESCRIPTION =================
@@ -247,7 +255,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
                 ax.set_ylabel(parameter.capitalize())
 
                 ax.set_title(
-                    f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid: ({grid_lat},{grid_lon})"
+                    f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
                 )
 
                 ax.grid(True)
@@ -259,4 +267,3 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
 else:
     st.info("Enter latitude and longitude and click Submit to fetch data.")
-```
