@@ -5,6 +5,8 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
+import folium
+from streamlit_folium import st_folium
 
 st.set_page_config(layout="wide")
 st.title("Weather Data Dashboard")
@@ -34,28 +36,27 @@ GRID_CONFIG = {
     }
 }
 
+MAX_YEAR_SELECTION = 5
+
 # ================= SIDEBAR =================
 st.sidebar.header("Filters")
 
 if "parameter" not in st.session_state:
     st.session_state.parameter = "rain"
-if "years" not in st.session_state:
-    st.session_state.years = []
 if "lat" not in st.session_state:
     st.session_state.lat = ""
 if "lon" not in st.session_state:
     st.session_state.lon = ""
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 if "start_date" not in st.session_state:
     st.session_state.start_date = None
 if "end_date" not in st.session_state:
     st.session_state.end_date = None
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
 
 parameter = st.sidebar.selectbox(
     "Select Parameter",
-    ["rain", "tmax", "tmin"],
-    index=["rain","tmax","tmin"].index(st.session_state.parameter)
+    ["rain", "tmax", "tmin"]
 )
 
 config = GRID_CONFIG[parameter]
@@ -69,26 +70,23 @@ if not parquet_files:
 
 years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-# ================= MULTI YEAR SELECT =================
-MAX_YEARS = 5
-
 selected_years = st.sidebar.multiselect(
     "Select Years",
     years,
-    default=st.session_state.years
+    default=[years[0]]
 )
 
-if len(selected_years) > MAX_YEARS:
-    st.sidebar.error(f"You can select maximum {MAX_YEARS} years.")
+if len(selected_years) > MAX_YEAR_SELECTION:
+    st.sidebar.error(f"Select maximum {MAX_YEAR_SELECTION} years")
     st.stop()
 
 # ================= LOAD DATA =================
 @st.cache_data
-def load_year_data(parameter, selected_years):
+def load_years_data(parameter, years):
 
-    dfs = []
+    df_list = []
 
-    for year in selected_years:
+    for year in years:
         file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
         df = pd.read_parquet(file)
 
@@ -96,17 +94,13 @@ def load_year_data(parameter, selected_years):
         df["lat"] = pd.to_numeric(df["lat"])
         df["lon"] = pd.to_numeric(df["lon"])
 
-        dfs.append(df)
+        df_list.append(df)
 
-    combined_df = pd.concat(dfs, ignore_index=True)
+    df = pd.concat(df_list)
 
-    return combined_df
+    return df
 
-if selected_years:
-    df = load_year_data(parameter, selected_years)
-else:
-    st.warning("Please select at least one year.")
-    st.stop()
+df = load_years_data(parameter, selected_years)
 
 # ================= BUILD KD TREE =================
 @st.cache_resource
@@ -123,49 +117,66 @@ tree, grid_points = build_kdtree(df)
 min_date = df["date"].min()
 max_date = df["date"].max()
 
-col1, col2 = st.sidebar.columns(2)
+start_date = st.sidebar.date_input(
+    "Start Date",
+    value=st.session_state.start_date or min_date,
+    min_value=min_date,
+    max_value=max_date
+)
 
-with col1:
-    start_date = st.date_input(
-        "Start Date",
-        value=st.session_state.start_date or min_date,
-        min_value=min_date,
-        max_value=max_date
-    )
+end_date = st.sidebar.date_input(
+    "End Date",
+    value=st.session_state.end_date or max_date,
+    min_value=min_date,
+    max_value=max_date
+)
 
-with col2:
-    end_date = st.date_input(
-        "End Date",
-        value=st.session_state.end_date or max_date,
-        min_value=min_date,
-        max_value=max_date
-    )
+if start_date > end_date:
+    st.sidebar.error("Start Date must be before End Date")
+    st.stop()
 
 # ================= LAT LON INPUT =================
 lat_input = st.sidebar.text_input("Enter Latitude", st.session_state.lat)
 lon_input = st.sidebar.text_input("Enter Longitude", st.session_state.lon)
+
+# ================= MAP SELECT =================
+st.sidebar.markdown("### Or Select Location on Map")
+
+m = folium.Map(location=[20.5937,78.9629], zoom_start=4)
+
+map_data = st_folium(m, height=350, width=300)
+
+if map_data and map_data["last_clicked"] is not None:
+
+    clicked_lat = map_data["last_clicked"]["lat"]
+    clicked_lon = map_data["last_clicked"]["lng"]
+
+    lat_input = str(round(clicked_lat,4))
+    lon_input = str(round(clicked_lon,4))
+
+    st.sidebar.write(f"Selected: {lat_input}, {lon_input}")
 
 # ================= BUTTONS =================
 submit_button = st.sidebar.button("Submit")
 reset_button = st.sidebar.button("Reset")
 
 if reset_button:
+
     st.session_state.lat = ""
     st.session_state.lon = ""
     st.session_state.start_date = None
     st.session_state.end_date = None
     st.session_state.parameter = "rain"
-    st.session_state.years = []
     st.session_state.submitted = False
+
     st.experimental_rerun()
 
 if submit_button:
+
     st.session_state.lat = lat_input
     st.session_state.lon = lon_input
     st.session_state.start_date = start_date
     st.session_state.end_date = end_date
-    st.session_state.parameter = parameter
-    st.session_state.years = selected_years
     st.session_state.submitted = True
 
 # ================= MAIN LOGIC =================
@@ -175,6 +186,14 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         lat_val = float(st.session_state.lat)
         lon_val = float(st.session_state.lon)
+
+        if not (config["lat_min"] <= lat_val <= config["lat_max"]):
+            st.error("Latitude outside IMD bounds.")
+            st.stop()
+
+        if not (config["lon_min"] <= lon_val <= config["lon_max"]):
+            st.error("Longitude outside IMD bounds.")
+            st.stop()
 
         # ===== SAFE DATE HANDLING =====
         start_date = st.session_state.start_date
@@ -189,34 +208,17 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         start_date = pd.to_datetime(start_date)
         end_date = pd.to_datetime(end_date)
 
-        if start_date > end_date:
-            st.error("Start Date must be before End Date.")
-            st.stop()
-
-        # ===== Bounds Check =====
-        if not (config["lat_min"] <= lat_val <= config["lat_max"]):
-            st.error("Latitude outside IMD bounds.")
-            st.stop()
-
-        if not (config["lon_min"] <= lon_val <= config["lon_max"]):
-            st.error("Longitude outside IMD bounds.")
-            st.stop()
-
-        df_range = df[
+        date_filtered = df[
             (df["date"] >= start_date) &
             (df["date"] <= end_date)
         ]
 
-        if df_range.empty:
-            st.warning("No data available for selected date range.")
-            st.stop()
-
         epsilon = 1e-6
 
         # ===== EXACT GRID CHECK =====
-        exact_row = df_range[
-            (np.abs(df_range["lat"] - lat_val) < epsilon) &
-            (np.abs(df_range["lon"] - lon_val) < epsilon)
+        exact_row = date_filtered[
+            (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
+            (np.abs(date_filtered["lon"] - lon_val) < epsilon)
         ]
 
         if not exact_row.empty:
@@ -224,16 +226,17 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             grid_status = "Exact Grid Point Found"
             grid_lat = lat_val
             grid_lon = lon_val
-            row = exact_row.iloc[[0]]
+            row = exact_row
 
         else:
 
             dist, idx = tree.query([lat_val, lon_val])
+
             grid_lat, grid_lon = grid_points[idx]
 
-            row = df_range[
-                (np.abs(df_range["lat"] - grid_lat) < epsilon) &
-                (np.abs(df_range["lon"] - grid_lon) < epsilon)
+            row = date_filtered[
+                (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
+                (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
             ]
 
             if row.empty:
@@ -245,7 +248,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         value = row.iloc[0][parameter]
 
         # ================= TABS =================
-        tabs = st.tabs(["Description", "Tabular", "Graphical"])
+        tabs = st.tabs(["Description","Tabular","Graphical"])
 
         # ================= DESCRIPTION =================
         with tabs[0]:
@@ -264,7 +267,8 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
                 st.write("Grid Longitude Used:", grid_lon)
 
             with col2:
-                st.write("Date Range:", f"{start_date.date()} to {end_date.date()}")
+                st.write("Start Date:", start_date.date())
+                st.write("End Date:", end_date.date())
                 st.write("Resolution:", f"{config['resolution']}°")
                 st.write("Value:", value)
 
@@ -275,11 +279,10 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
             st.write(f"Entered Location: ({lat_val}, {lon_val})")
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
-            st.write(f"Date Range: {start_date.date()} to {end_date.date()}")
 
-            all_data = df_range[
-                (np.abs(df_range["lat"] - grid_lat) < epsilon) &
-                (np.abs(df_range["lon"] - grid_lon) < epsilon)
+            all_data = date_filtered[
+                (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
+                (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
             ].sort_values("date")
 
             if all_data.empty:
@@ -304,7 +307,6 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
             st.write(f"Entered Location: ({lat_val}, {lon_val})")
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
-            st.write(f"Date Range: {start_date.date()} to {end_date.date()}")
 
             if all_data.empty:
                 st.warning("No historical data.")
@@ -329,4 +331,4 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         st.error("Latitude and Longitude must be numeric.")
 
 else:
-    st.info("Enter latitude and longitude, select years and date range, then click Submit.")
+    st.info("Enter latitude and longitude and click Submit to fetch data.")
