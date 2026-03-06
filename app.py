@@ -9,6 +9,9 @@ from scipy.spatial import cKDTree
 st.set_page_config(layout="wide")
 st.title("Weather Data Dashboard")
 
+# ================= MAX YEARS LIMIT =================
+MAX_YEARS = 5
+
 # ================= GRID CONFIG =================
 GRID_CONFIG = {
     "rain": {
@@ -39,17 +42,23 @@ st.sidebar.header("Filters")
 
 if "parameter" not in st.session_state:
     st.session_state.parameter = "rain"
-if "year" not in st.session_state:
-    st.session_state.year = None
+
+if "years" not in st.session_state:
+    st.session_state.years = []
+
 if "lat" not in st.session_state:
     st.session_state.lat = ""
+
 if "lon" not in st.session_state:
     st.session_state.lon = ""
+
 if "date" not in st.session_state:
     st.session_state.date = None
+
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
+# ================= PARAMETER =================
 parameter = st.sidebar.selectbox(
     "Select Parameter",
     ["rain", "tmax", "tmin"],
@@ -58,6 +67,7 @@ parameter = st.sidebar.selectbox(
 
 config = GRID_CONFIG[parameter]
 
+# ================= DATA FILES =================
 data_folder = os.path.join("data", parameter)
 parquet_files = glob.glob(os.path.join(data_folder, "*.parquet"))
 
@@ -67,27 +77,45 @@ if not parquet_files:
 
 years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-selected_year = st.sidebar.selectbox(
-    "Select Year",
+# ================= MULTI YEAR SELECT =================
+selected_years = st.sidebar.multiselect(
+    f"Select Years (max {MAX_YEARS})",
     years,
-    index=years.index(st.session_state.year) if st.session_state.year in years else 0
+    default=st.session_state.years
 )
+
+if len(selected_years) > MAX_YEARS:
+    st.sidebar.error(f"You can select maximum {MAX_YEARS} years.")
+    st.stop()
 
 # ================= LOAD DATA =================
 @st.cache_data
-def load_year_data(parameter, year):
+def load_year_data(parameter, years):
 
-    file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
+    dfs = []
 
-    df = pd.read_parquet(file)
+    for year in years:
 
-    df["date"] = pd.to_datetime(df["date"])
-    df["lat"] = pd.to_numeric(df["lat"])
-    df["lon"] = pd.to_numeric(df["lon"])
+        file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
 
-    return df
+        df = pd.read_parquet(file)
 
-df = load_year_data(parameter, selected_year)
+        df["date"] = pd.to_datetime(df["date"])
+        df["lat"] = pd.to_numeric(df["lat"])
+        df["lon"] = pd.to_numeric(df["lon"])
+
+        dfs.append(df)
+
+    final_df = pd.concat(dfs, ignore_index=True)
+
+    return final_df
+
+
+if selected_years:
+    df = load_year_data(parameter, selected_years)
+else:
+    st.warning("Please select at least one year.")
+    st.stop()
 
 # ================= BUILD KD TREE =================
 @st.cache_resource
@@ -124,7 +152,7 @@ if reset_button:
     st.session_state.lon = ""
     st.session_state.date = None
     st.session_state.parameter = "rain"
-    st.session_state.year = None
+    st.session_state.years = []
     st.session_state.submitted = False
     st.experimental_rerun()
 
@@ -133,7 +161,7 @@ if submit_button:
     st.session_state.lon = lon_input
     st.session_state.date = selected_date
     st.session_state.parameter = parameter
-    st.session_state.year = selected_year
+    st.session_state.years = selected_years
     st.session_state.submitted = True
 
 # ================= MAIN LOGIC =================
@@ -144,7 +172,6 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         lat_val = float(st.session_state.lat)
         lon_val = float(st.session_state.lon)
 
-        # ===== Bounds Check =====
         if not (config["lat_min"] <= lat_val <= config["lat_max"]):
             st.error("Latitude outside IMD bounds.")
             st.stop()
@@ -154,6 +181,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.stop()
 
         selected_date = pd.to_datetime(st.session_state.date)
+
         date_filtered = df[df["date"] == selected_date]
 
         if date_filtered.empty:
@@ -162,7 +190,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         epsilon = 1e-6
 
-        # ===== EXACT GRID CHECK =====
+        # ===== EXACT GRID =====
         exact_row = date_filtered[
             (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
             (np.abs(date_filtered["lon"] - lon_val) < epsilon)
@@ -177,7 +205,6 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         else:
 
-            # ===== KD TREE NEAREST SEARCH =====
             dist, idx = tree.query([lat_val, lon_val])
 
             grid_lat, grid_lon = grid_points[idx]
