@@ -4,6 +4,7 @@ import os
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial import cKDTree
 
 st.set_page_config(layout="wide")
 st.title("IMD Weather Data Dashboard")
@@ -75,14 +76,29 @@ selected_year = st.sidebar.selectbox(
 # ================= LOAD DATA =================
 @st.cache_data
 def load_year_data(parameter, year):
+
     file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
+
     df = pd.read_parquet(file)
+
     df["date"] = pd.to_datetime(df["date"])
     df["lat"] = pd.to_numeric(df["lat"])
     df["lon"] = pd.to_numeric(df["lon"])
+
     return df
 
 df = load_year_data(parameter, selected_year)
+
+# ================= BUILD KD TREE =================
+@st.cache_resource
+def build_kdtree(dataframe):
+
+    grid_points = dataframe[["lat","lon"]].drop_duplicates().values
+    tree = cKDTree(grid_points)
+
+    return tree, grid_points
+
+tree, grid_points = build_kdtree(df)
 
 # ================= DATE PICKER =================
 min_date = df["date"].min()
@@ -124,6 +140,7 @@ if submit_button:
 if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
     try:
+
         lat_val = float(st.session_state.lat)
         lon_val = float(st.session_state.lon)
 
@@ -160,26 +177,21 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         else:
 
-            # ===== NEAREST GRID CALCULATION =====
-            res = config["resolution"]
-            lat_min = config["lat_min"]
-            lon_min = config["lon_min"]
+            # ===== KD TREE NEAREST SEARCH =====
+            dist, idx = tree.query([lat_val, lon_val])
 
-            nearest_lat = round((lat_val - lat_min) / res) * res + lat_min
-            nearest_lon = round((lon_val - lon_min) / res) * res + lon_min
+            grid_lat, grid_lon = grid_points[idx]
 
             row = date_filtered[
-                (np.abs(date_filtered["lat"] - nearest_lat) < epsilon) &
-                (np.abs(date_filtered["lon"] - nearest_lon) < epsilon)
+                (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
+                (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
             ]
 
             if row.empty:
-                st.error("Nearest grid not found in dataset.")
+                st.error("Nearest grid not found.")
                 st.stop()
 
             grid_status = "Nearest Grid Found"
-            grid_lat = nearest_lat
-            grid_lon = nearest_lon
 
         value = row.iloc[0][parameter]
 
@@ -221,7 +233,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             ].sort_values("date")
 
             if all_data.empty:
-                st.warning("No historical data for this grid point.")
+                st.warning("No historical data.")
             else:
 
                 st.dataframe(all_data)
@@ -244,7 +256,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
 
             if all_data.empty:
-                st.warning("No historical data to plot.")
+                st.warning("No historical data.")
             else:
 
                 fig, ax = plt.subplots(figsize=(10,4))
