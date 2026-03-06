@@ -39,25 +39,18 @@ st.sidebar.header("Filters")
 
 if "parameter" not in st.session_state:
     st.session_state.parameter = "rain"
-
 if "years" not in st.session_state:
     st.session_state.years = []
-
 if "lat" not in st.session_state:
     st.session_state.lat = ""
-
 if "lon" not in st.session_state:
     st.session_state.lon = ""
-
 if "start_date" not in st.session_state:
     st.session_state.start_date = None
-
 if "end_date" not in st.session_state:
     st.session_state.end_date = None
-
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
-
 
 parameter = st.sidebar.selectbox(
     "Select Parameter",
@@ -76,44 +69,43 @@ if not parquet_files:
 
 years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-# ===== MULTI YEAR SELECTION =====
+# ================= MULTI YEAR SELECT =================
+MAX_YEARS = 5
+
 selected_years = st.sidebar.multiselect(
-    "Select Years (max 5)",
+    "Select Years",
     years,
     default=st.session_state.years
 )
 
-MAX_YEARS = 5
-
 if len(selected_years) > MAX_YEARS:
-    st.sidebar.error(f"Select maximum {MAX_YEARS} years only.")
+    st.sidebar.error(f"You can select maximum {MAX_YEARS} years.")
     st.stop()
 
 # ================= LOAD DATA =================
 @st.cache_data
-def load_years_data(parameter, years):
+def load_year_data(parameter, selected_years):
 
-    all_df = []
+    dfs = []
 
-    for year in years:
-
+    for year in selected_years:
         file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
-
         df = pd.read_parquet(file)
 
         df["date"] = pd.to_datetime(df["date"])
         df["lat"] = pd.to_numeric(df["lat"])
         df["lon"] = pd.to_numeric(df["lon"])
 
-        all_df.append(df)
+        dfs.append(df)
 
-    return pd.concat(all_df, ignore_index=True)
+    combined_df = pd.concat(dfs, ignore_index=True)
 
+    return combined_df
 
 if selected_years:
-    df = load_years_data(parameter, selected_years)
+    df = load_year_data(parameter, selected_years)
 else:
-    st.info("Please select at least one year.")
+    st.warning("Please select at least one year.")
     st.stop()
 
 # ================= BUILD KD TREE =================
@@ -131,19 +123,23 @@ tree, grid_points = build_kdtree(df)
 min_date = df["date"].min()
 max_date = df["date"].max()
 
-start_date = st.sidebar.date_input(
-    "Start Date",
-    value=st.session_state.start_date or min_date,
-    min_value=min_date,
-    max_value=max_date
-)
+col1, col2 = st.sidebar.columns(2)
 
-end_date = st.sidebar.date_input(
-    "End Date",
-    value=st.session_state.end_date or max_date,
-    min_value=min_date,
-    max_value=max_date
-)
+with col1:
+    start_date = st.date_input(
+        "Start Date",
+        value=st.session_state.start_date or min_date,
+        min_value=min_date,
+        max_value=max_date
+    )
+
+with col2:
+    end_date = st.date_input(
+        "End Date",
+        value=st.session_state.end_date or max_date,
+        min_value=min_date,
+        max_value=max_date
+    )
 
 # ================= LAT LON INPUT =================
 lat_input = st.sidebar.text_input("Enter Latitude", st.session_state.lat)
@@ -154,7 +150,6 @@ submit_button = st.sidebar.button("Submit")
 reset_button = st.sidebar.button("Reset")
 
 if reset_button:
-
     st.session_state.lat = ""
     st.session_state.lon = ""
     st.session_state.start_date = None
@@ -162,11 +157,9 @@ if reset_button:
     st.session_state.parameter = "rain"
     st.session_state.years = []
     st.session_state.submitted = False
-
     st.experimental_rerun()
 
 if submit_button:
-
     st.session_state.lat = lat_input
     st.session_state.lon = lon_input
     st.session_state.start_date = start_date
@@ -175,7 +168,6 @@ if submit_button:
     st.session_state.years = selected_years
     st.session_state.submitted = True
 
-
 # ================= MAIN LOGIC =================
 if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
@@ -183,6 +175,23 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         lat_val = float(st.session_state.lat)
         lon_val = float(st.session_state.lon)
+
+        # ===== SAFE DATE HANDLING =====
+        start_date = st.session_state.start_date
+        end_date = st.session_state.end_date
+
+        if start_date is None:
+            start_date = df["date"].min()
+
+        if end_date is None:
+            end_date = df["date"].max()
+
+        start_date = pd.to_datetime(start_date)
+        end_date = pd.to_datetime(end_date)
+
+        if start_date > end_date:
+            st.error("Start Date must be before End Date.")
+            st.stop()
 
         # ===== Bounds Check =====
         if not (config["lat_min"] <= lat_val <= config["lat_max"]):
@@ -193,15 +202,21 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.error("Longitude outside IMD bounds.")
             st.stop()
 
-        start_date = pd.to_datetime(st.session_state.start_date)
-        end_date = pd.to_datetime(st.session_state.end_date)
+        df_range = df[
+            (df["date"] >= start_date) &
+            (df["date"] <= end_date)
+        ]
+
+        if df_range.empty:
+            st.warning("No data available for selected date range.")
+            st.stop()
 
         epsilon = 1e-6
 
         # ===== EXACT GRID CHECK =====
-        exact_row = df[
-            (np.abs(df["lat"] - lat_val) < epsilon) &
-            (np.abs(df["lon"] - lon_val) < epsilon)
+        exact_row = df_range[
+            (np.abs(df_range["lat"] - lat_val) < epsilon) &
+            (np.abs(df_range["lon"] - lon_val) < epsilon)
         ]
 
         if not exact_row.empty:
@@ -209,24 +224,25 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             grid_status = "Exact Grid Point Found"
             grid_lat = lat_val
             grid_lon = lon_val
+            row = exact_row.iloc[[0]]
 
         else:
 
             dist, idx = tree.query([lat_val, lon_val])
-
             grid_lat, grid_lon = grid_points[idx]
+
+            row = df_range[
+                (np.abs(df_range["lat"] - grid_lat) < epsilon) &
+                (np.abs(df_range["lon"] - grid_lon) < epsilon)
+            ]
+
+            if row.empty:
+                st.error("Nearest grid not found.")
+                st.stop()
 
             grid_status = "Nearest Grid Found"
 
-
-        # ===== DATE FILTER =====
-        all_data = df[
-            (np.abs(df["lat"] - grid_lat) < epsilon) &
-            (np.abs(df["lon"] - grid_lon) < epsilon) &
-            (df["date"] >= start_date) &
-            (df["date"] <= end_date)
-        ].sort_values("date")
-
+        value = row.iloc[0][parameter]
 
         # ================= TABS =================
         tabs = st.tabs(["Description", "Tabular", "Graphical"])
@@ -248,9 +264,9 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
                 st.write("Grid Longitude Used:", grid_lon)
 
             with col2:
-                st.write("Start Date:", start_date.date())
-                st.write("End Date:", end_date.date())
+                st.write("Date Range:", f"{start_date.date()} to {end_date.date()}")
                 st.write("Resolution:", f"{config['resolution']}°")
+                st.write("Value:", value)
 
         # ================= TABULAR =================
         with tabs[1]:
@@ -259,9 +275,15 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
             st.write(f"Entered Location: ({lat_val}, {lon_val})")
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
+            st.write(f"Date Range: {start_date.date()} to {end_date.date()}")
+
+            all_data = df_range[
+                (np.abs(df_range["lat"] - grid_lat) < epsilon) &
+                (np.abs(df_range["lon"] - grid_lon) < epsilon)
+            ].sort_values("date")
 
             if all_data.empty:
-                st.warning("No data in selected date range.")
+                st.warning("No historical data.")
             else:
 
                 st.dataframe(all_data)
@@ -282,9 +304,10 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
             st.write(f"Entered Location: ({lat_val}, {lon_val})")
             st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
+            st.write(f"Date Range: {start_date.date()} to {end_date.date()}")
 
             if all_data.empty:
-                st.warning("No data in selected date range.")
+                st.warning("No historical data.")
             else:
 
                 fig, ax = plt.subplots(figsize=(10,4))
@@ -306,4 +329,4 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         st.error("Latitude and Longitude must be numeric.")
 
 else:
-    st.info("Enter latitude and longitude and click Submit to fetch data.")
+    st.info("Enter latitude and longitude, select years and date range, then click Submit.")
