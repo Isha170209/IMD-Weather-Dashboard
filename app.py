@@ -174,7 +174,7 @@ elif location_method == "Select Location on Map":
 
     m = folium.Map(location=[20.5937,78.9629], zoom_start=4)
 
-    map_data = st_folium(m, height=350, width=300)
+    map_data = st_folium(m, height=400, width=800)
 
     if map_data and map_data["last_clicked"] is not None:
 
