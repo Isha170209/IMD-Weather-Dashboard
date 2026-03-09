@@ -187,7 +187,7 @@ elif location_method == "Select Location on Map":
         overlay=True
     ).add_to(m)
 
-    map_data = st_folium(m, height=350, width=300)
+    map_data = st_folium(m, height=500, width=900)
 
     if map_data and map_data["last_clicked"] is not None:
 
