@@ -297,8 +297,9 @@ elif st.session_state.page=="dashboard":
 
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
-
 # ================= LOCATION INPUT =================
+
+if st.session_state.mode=="download":
 
     st.sidebar.markdown("### Enter Location")
 
@@ -315,8 +316,7 @@ elif st.session_state.page=="dashboard":
 
 # ================= MAIN OUTPUT =================
 
-    if st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
-
+    if st.session_state.mode=="download" and st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
         lat_val=float(st.session_state.lat_val)
         lon_val=float(st.session_state.lon_val)
 
