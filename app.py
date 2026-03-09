@@ -18,24 +18,32 @@ img {
 }
 .home-box {
     border:2px solid #4CAF50;
-    padding:40px;
+    padding:50px;
     text-align:center;
     font-size:28px;
     border-radius:10px;
     background-color:#f9f9f9;
     cursor:pointer;
+    transition:0.3s;
+}
+.home-box:hover {
+    background-color:#e8f5e9;
+}
+button.boxbutton {
+    background:none;
+    border:none;
+    width:100%;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= SESSION STATE PAGE CONTROL =================
+# ================= PAGE CONTROL =================
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
 # ================================================================
 # =========================== HOME PAGE ==========================
 # ================================================================
-
 if st.session_state.page == "home":
 
     col1, col2 = st.columns([8,2])
@@ -49,25 +57,16 @@ if st.session_state.page == "home":
             st.image(logo_path,width=100)
 
     st.write("")
+    st.write("")
 
-    st.markdown(
-        """
-        <div class="home-box">
-        View / Download IMD Gridded Weather Data
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    if st.button("Open Dashboard"):
-
+    # Clickable box
+    if st.button("View / Download IMD Gridded Weather Data", key="homebox"):
         st.session_state.page = "dashboard"
         st.rerun()
 
 # ================================================================
 # ======================== DASHBOARD PAGE ========================
 # ================================================================
-
 elif st.session_state.page == "dashboard":
 
     # ================= HEADER WITH LOGO =================
