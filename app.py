@@ -17,7 +17,6 @@ img {border-radius:0px !important;}
 </style>
 """, unsafe_allow_html=True)
 
-
 # ================= COLOR FUNCTIONS =================
 
 def rain_color(val):
@@ -60,23 +59,20 @@ def temp_color(val):
 
 def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
 
-    df_day=df[df["date"]==pd.to_datetime(selected_date)]
+    df_day = df[df["date"] == pd.to_datetime(selected_date)]
 
-    for _,row in df_day.iterrows():
+    for _, row in df_day.iterrows():
 
-        lat=row["lat"]
-        lon=row["lon"]
-        value=row[parameter]
+        lat = row["lat"]
+        lon = row["lon"]
+        value = row[parameter]
 
-        bounds=[
-        [lat-resolution/2,lon-resolution/2],
-        [lat+resolution/2,lon+resolution/2]
+        bounds = [
+            [lat-resolution/2, lon-resolution/2],
+            [lat+resolution/2, lon+resolution/2]
         ]
 
-        if parameter=="rain":
-            color=rain_color(value)
-        else:
-            color=temp_color(value)
+        color = rain_color(value) if parameter == "rain" else temp_color(value)
 
         popup=f"""
         Lat: {lat}<br>
@@ -85,13 +81,13 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         """
 
         folium.Rectangle(
-        bounds=bounds,
-        color="black",
-        weight=0.3,
-        fill=True,
-        fill_color=color,
-        fill_opacity=0.7,
-        popup=popup
+            bounds=bounds,
+            color="black",
+            weight=0.3,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.7,
+            popup=popup
         ).add_to(map_obj)
 
 
@@ -157,20 +153,17 @@ elif st.session_state.page=="dashboard":
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
 
-
     GRID_CONFIG={
-    "rain":{"resolution":0.25},
-    "tmax":{"resolution":1.0},
-    "tmin":{"resolution":1.0}
+        "rain":{"resolution":0.25},
+        "tmax":{"resolution":1.0},
+        "tmin":{"resolution":1.0}
     }
-
 
     st.sidebar.header("Filters")
 
     if st.sidebar.button("🏠 Home"):
         st.session_state.page="home"
         st.rerun()
-
 
     parameter=st.sidebar.selectbox("Select Parameter",["rain","tmax","tmin"])
 
@@ -198,73 +191,33 @@ elif st.session_state.page=="dashboard":
         max_date=df["date"].max()
 
         selected_date=st.sidebar.date_input(
-        "Select Date",
-        value=min_date,
-        min_value=min_date,
-        max_value=max_date
+            "Select Date",
+            value=min_date,
+            min_value=min_date,
+            max_value=max_date
         )
 
         resolution=GRID_CONFIG[parameter]["resolution"]
 
         map_obj=folium.Map(
-        location=[22.5,79],
-        zoom_start=5,
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri Satellite"
+            location=[22.5,79],
+            zoom_start=5,
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri Satellite"
         )
 
-        draw_india_grid(
-        map_obj,
-        df,
-        parameter,
-        selected_date,
-        resolution
-        )
-
-        # ===== Legend =====
-
-        if parameter=="rain":
-
-            legend_html="""
-            <div style="position: fixed; bottom: 20px; left: 50px;
-            background:white;border:2px solid grey;padding:10px;">
-            <b>Rainfall (mm)</b><br>
-            <i style="background:#08306B;width:18px;height:18px;float:left;margin-right:8px"></i>>200<br>
-            <i style="background:#2171B5;width:18px;height:18px;float:left;margin-right:8px"></i>100-200<br>
-            <i style="background:#6BAED6;width:18px;height:18px;float:left;margin-right:8px"></i>50-100<br>
-            <i style="background:#C6DBEF;width:18px;height:18px;float:left;margin-right:8px"></i>10-50<br>
-            <i style="background:#F7FBFF;width:18px;height:18px;float:left;margin-right:8px"></i><10
-            </div>
-            """
-
-        else:
-
-            legend_html="""
-            <div style="position: fixed; bottom: 20px; left: 50px;
-            background:white;border:2px solid grey;padding:10px;">
-            <b>Temperature (°C)</b><br>
-            <i style="background:#800026;width:18px;height:18px;float:left;margin-right:8px"></i>>=40<br>
-            <i style="background:#BD0026;width:18px;height:18px;float:left;margin-right:8px"></i>35-40<br>
-            <i style="background:#FC4E2A;width:18px;height:18px;float:left;margin-right:8px"></i>30-35<br>
-            <i style="background:#FD8D3C;width:18px;height:18px;float:left;margin-right:8px"></i>25-30<br>
-            <i style="background:#FEB24C;width:18px;height:18px;float:left;margin-right:8px"></i>20-25<br>
-            <i style="background:#31A354;width:18px;height:18px;float:left;margin-right:8px"></i><20
-            </div>
-            """
-
-        map_obj.get_root().html.add_child(folium.Element(legend_html))
+        draw_india_grid(map_obj, df, parameter, selected_date, resolution)
 
         st_folium(map_obj,height=650,width=1100)
 
-# ================= DOWNLOAD MODE =================
+
+# ======================================================
+# ==================== DOWNLOAD MODE ===================
+# ======================================================
 
     else:
 
-        selected_years=st.sidebar.multiselect(
-        "Select Years",
-        years,
-        default=[years[0]]
-        )
+        selected_years=st.sidebar.multiselect("Select Years",years,default=[years[0]])
 
         @st.cache_data
         def load_years_data(parameter,years):
@@ -283,9 +236,7 @@ elif st.session_state.page=="dashboard":
 
                 df_list.append(df)
 
-            df=pd.concat(df_list)
-
-            return df
+            return pd.concat(df_list)
 
         df=load_years_data(parameter,selected_years)
 
@@ -296,49 +247,6 @@ elif st.session_state.page=="dashboard":
         end_date=st.sidebar.date_input("End Date",value=max_date)
 
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
-
-# ================= DOWNLOAD MODE =================
-
-    else:
-
-        selected_years=st.sidebar.multiselect(
-        "Select Years",
-        years,
-        default=[years[0]]
-        )
-
-        @st.cache_data
-        def load_years_data(parameter,years):
-
-            df_list=[]
-
-            for year in years:
-
-                file=glob.glob(os.path.join("data",parameter,f"{year}*.parquet"))[0]
-
-                df=pd.read_parquet(file)
-
-                df["date"]=pd.to_datetime(df["date"])
-                df["lat"]=pd.to_numeric(df["lat"])
-                df["lon"]=pd.to_numeric(df["lon"])
-
-                df_list.append(df)
-
-            df=pd.concat(df_list)
-
-            return df
-
-        df=load_years_data(parameter,selected_years)
-
-        min_date=df["date"].min()
-        max_date=df["date"].max()
-
-        start_date=st.sidebar.date_input("Start Date",value=min_date)
-        end_date=st.sidebar.date_input("End Date",value=max_date)
-
-        df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
-
-        # ================= LOCATION INPUT =================
 
         st.sidebar.markdown("### Enter Location")
 
@@ -352,9 +260,7 @@ elif st.session_state.page=="dashboard":
             st.session_state.lat_val=lat_input
             st.session_state.lon_val=lon_input
 
-        # ================= MAIN OUTPUT =================
-
-        if st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
+        if st.session_state.submitted:
 
             lat_val=float(st.session_state.lat_val)
             lon_val=float(st.session_state.lon_val)
@@ -369,29 +275,22 @@ elif st.session_state.page=="dashboard":
             epsilon=1e-6
 
             row=df[
-            (np.abs(df["lat"]-grid_lat)<epsilon)&
-            (np.abs(df["lon"]-grid_lon)<epsilon)
+                (np.abs(df["lat"]-grid_lat)<epsilon)&
+                (np.abs(df["lon"]-grid_lon)<epsilon)
             ]
 
             all_data=row.sort_values("date")
 
             st.subheader("Tabular Data")
-
-            preview_rows=5000
-
-            if len(all_data)>preview_rows:
-                st.warning(f"Showing first {preview_rows} rows only")
-                st.dataframe(all_data.head(preview_rows))
-            else:
-                st.dataframe(all_data)
+            st.dataframe(all_data)
 
             csv=all_data.to_csv(index=False).encode('utf-8')
 
             st.download_button(
-            "Download CSV",
-            csv,
-            "imd_gridded_weather_data.csv",
-            "text/csv"
+                "Download CSV",
+                csv,
+                "imd_gridded_weather_data.csv",
+                "text/csv"
             )
 
             st.subheader("Graphical Data")
@@ -404,7 +303,7 @@ elif st.session_state.page=="dashboard":
             ax.set_ylabel(parameter.capitalize())
 
             ax.set_title(
-            f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
+                f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
             )
 
             ax.grid(True)
