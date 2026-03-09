@@ -31,6 +31,30 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
+# ================= GRID OVERLAY FUNCTION =================
+def add_imd_grid_overlay(map_obj, config):
+
+    lat_vals = np.arange(config["lat_min"], config["lat_max"] + config["resolution"], config["resolution"])
+    lon_vals = np.arange(config["lon_min"], config["lon_max"] + config["resolution"], config["resolution"])
+
+    # Latitude grid lines
+    for lat in lat_vals:
+        folium.PolyLine(
+            locations=[(lat, config["lon_min"]), (lat, config["lon_max"])],
+            color="cyan",
+            weight=0.4,
+            opacity=0.6
+        ).add_to(map_obj)
+
+    # Longitude grid lines
+    for lon in lon_vals:
+        folium.PolyLine(
+            locations=[(config["lat_min"], lon), (config["lat_max"], lon)],
+            color="cyan",
+            weight=0.4,
+            opacity=0.6
+        ).add_to(map_obj)
+
 # ================= PAGE STATE =================
 if "page" not in st.session_state:
     st.session_state.page="home"
@@ -111,7 +135,7 @@ elif st.session_state.page=="dashboard":
 
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-    # ================= VIEW MODE FILTER =================
+    # ================= VIEW MODE =================
     if st.session_state.mode=="view":
 
         selected_year=st.sidebar.selectbox("Select Year",years)
@@ -132,7 +156,7 @@ elif st.session_state.page=="dashboard":
         max_value=max_date
         )
 
-    # ================= DOWNLOAD MODE FILTER =================
+    # ================= DOWNLOAD MODE =================
     else:
 
         selected_years=st.sidebar.multiselect(
@@ -205,7 +229,16 @@ elif st.session_state.page=="dashboard":
 
     else:
 
-        m=folium.Map(location=[20.5937,78.9629],zoom_start=4,tiles="Esri.WorldImagery")
+        m=folium.Map(
+        location=[20.5937,78.9629],
+        zoom_start=4,
+        tiles="Esri.WorldImagery",
+        attr="Esri"
+        )
+
+        # GRID OVERLAY ONLY IN VIEW MODE
+        if st.session_state.mode=="view":
+            add_imd_grid_overlay(m,config)
 
         map_data=st_folium(m,height=500,width=900)
 
