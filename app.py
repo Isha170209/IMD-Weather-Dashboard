@@ -172,7 +172,7 @@ elif location_method == "Select Location on Map":
 
     st.sidebar.markdown("Click on map to select location")
 
-    m = folium.Map(location=[20.5937,78.9629], zoom_start=4)
+    m = folium.Map(location=[20.5937,78.9629], zoom_start=4, tiles="Esri.WorldImagery", attr="Esri")
 
     map_data = st_folium(m, height=500, width=900)
 
