@@ -56,7 +56,7 @@ def add_legend(map_obj, parameter):
         legend_html = """
         <div style="
         position: fixed;
-        bottom: 50px; right: 50px; width: 150px; height: 170px;
+        bottom: 30px; right: 50px; width: 150px; height: 130px;
         background-color: white;
         border:2px solid grey;
         z-index:9999;
@@ -78,7 +78,7 @@ def add_legend(map_obj, parameter):
         legend_html = """
         <div style="
         position: fixed;
-        bottom: 50px; right: 50px; width: 150px; height: 190px;
+        bottom: 30px; right: 50px; width: 150px; height: 130px;
         background-color: white;
         border:2px solid grey;
         z-index:9999;
