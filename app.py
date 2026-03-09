@@ -297,91 +297,81 @@ elif st.session_state.page=="dashboard":
 
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
-# ================= LOCATION INPUT =================
+# ================= DOWNLOAD MODE =================
 
-if st.session_state.mode=="download":
+    else:
 
-    st.sidebar.markdown("### Enter Location")
+        selected_years=st.sidebar.multiselect(
+        "Select Years",
+        years,
+        default=[years[0]]
+        )
 
-    lat_input=st.sidebar.text_input("Enter Latitude")
-    lon_input=st.sidebar.text_input("Enter Longitude")
+        @st.cache_data
+        def load_years_data(parameter,years):
 
-    submit_button=st.sidebar.button("Submit")
+            df_list=[]
 
-    if submit_button:
-        st.session_state.submitted=True
-        st.session_state.lat_val=lat_input
-        st.session_state.lon_val=lon_input
+            for year in years:
 
+                file=glob.glob(os.path.join("data",parameter,f"{year}*.parquet"))[0]
 
-# ================= MAIN OUTPUT =================
+                df=pd.read_parquet(file)
 
-    if st.session_state.mode=="download" and st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
-        lat_val=float(st.session_state.lat_val)
-        lon_val=float(st.session_state.lon_val)
+                df["date"]=pd.to_datetime(df["date"])
+                df["lat"]=pd.to_numeric(df["lat"])
+                df["lon"]=pd.to_numeric(df["lon"])
 
-        grid_points=df[["lat","lon"]].drop_duplicates().values
-        tree=cKDTree(grid_points)
+                df_list.append(df)
 
-        dist,idx=tree.query([lat_val,lon_val])
+            df=pd.concat(df_list)
 
-        grid_lat,grid_lon=grid_points[idx]
+            return df
 
-        epsilon=1e-6
+        df=load_years_data(parameter,selected_years)
 
-        row=df[
-        (np.abs(df["lat"]-grid_lat)<epsilon)&
-        (np.abs(df["lon"]-grid_lon)<epsilon)
-        ]
+        min_date=df["date"].min()
+        max_date=df["date"].max()
 
+        start_date=st.sidebar.date_input("Start Date",value=min_date)
+        end_date=st.sidebar.date_input("End Date",value=max_date)
 
-# ================= VIEW OUTPUT =================
+        df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
-        if st.session_state.mode=="view":
+        # ================= LOCATION INPUT =================
 
-            row=row[row["date"]==pd.to_datetime(selected_date)]
-            value=row.iloc[0][parameter]
+        st.sidebar.markdown("### Enter Location")
 
-            st.subheader("Description")
+        lat_input=st.sidebar.text_input("Enter Latitude")
+        lon_input=st.sidebar.text_input("Enter Longitude")
 
-            col1,col2=st.columns(2)
+        submit_button=st.sidebar.button("Submit")
 
-            with col1:
-                st.write("Entered Latitude:",lat_val)
-                st.write("Entered Longitude:",lon_val)
-                st.write("Grid Latitude Used:",grid_lat)
-                st.write("Grid Longitude Used:",grid_lon)
+        if submit_button:
+            st.session_state.submitted=True
+            st.session_state.lat_val=lat_input
+            st.session_state.lon_val=lon_input
 
-            with col2:
-                st.write("Date:",selected_date)
-                st.write("Resolution:",f"{config['resolution']}°")
-                st.write("Value:",value)
+        # ================= MAIN OUTPUT =================
 
-            st.subheader("Grid Cell Visualization")
+        if st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
 
-            grid_map=folium.Map(
-                location=[grid_lat,grid_lon],
-                zoom_start=7,
-                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                attr="Esri Satellite"
-            )
+            lat_val=float(st.session_state.lat_val)
+            lon_val=float(st.session_state.lon_val)
 
-            draw_grid_cells(
-                grid_map,
-                df,
-                grid_lat,
-                grid_lon,
-                config["resolution"],
-                parameter,
-                selected_date
-            )
+            grid_points=df[["lat","lon"]].drop_duplicates().values
+            tree=cKDTree(grid_points)
 
-            st_folium(grid_map,height=500,width=900)
+            dist,idx=tree.query([lat_val,lon_val])
 
+            grid_lat,grid_lon=grid_points[idx]
 
-# ================= DOWNLOAD OUTPUT =================
+            epsilon=1e-6
 
-        else:
+            row=df[
+            (np.abs(df["lat"]-grid_lat)<epsilon)&
+            (np.abs(df["lon"]-grid_lon)<epsilon)
+            ]
 
             all_data=row.sort_values("date")
 
@@ -421,5 +411,5 @@ if st.session_state.mode=="download":
 
             st.pyplot(fig)
 
-    else:
-        st.info("Enter location and click Submit to fetch data.")
+        else:
+            st.info("Enter location and click Submit to fetch data.")
