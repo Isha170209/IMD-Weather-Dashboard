@@ -31,6 +31,7 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
+
 # ================= COLOR FUNCTIONS =================
 
 def rain_color(val):
@@ -117,6 +118,10 @@ if "page" not in st.session_state:
 if "mode" not in st.session_state:
     st.session_state.mode="view"
 
+if "view_submitted" not in st.session_state:
+    st.session_state.view_submitted=False
+
+
 # ======================================================
 # ======================= HOME PAGE ====================
 # ======================================================
@@ -186,6 +191,7 @@ elif st.session_state.page=="dashboard":
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
+
     # ================= VIEW MODE =================
 
     if st.session_state.mode=="view":
@@ -210,6 +216,9 @@ elif st.session_state.page=="dashboard":
 
         submit_button=st.sidebar.button("Submit")
 
+        if submit_button:
+            st.session_state.view_submitted=True
+
         map_obj=folium.Map(
         location=[22.5,79],
         zoom_start=5,
@@ -217,7 +226,7 @@ elif st.session_state.page=="dashboard":
         attr="Esri Satellite"
         )
 
-        if submit_button:
+        if st.session_state.view_submitted:
 
             draw_india_grid(
             map_obj,
@@ -226,8 +235,6 @@ elif st.session_state.page=="dashboard":
             selected_date,
             config["resolution"]
             )
-
-            # ================= LEGEND =================
 
             if parameter=="rain":
 
@@ -273,6 +280,9 @@ elif st.session_state.page=="dashboard":
         default=[years[0]]
         )
 
+        lat_input=st.sidebar.number_input("Latitude",value=20.0)
+        lon_input=st.sidebar.number_input("Longitude",value=78.0)
+
         @st.cache_data
         def load_years_data(parameter,years):
 
@@ -295,6 +305,15 @@ elif st.session_state.page=="dashboard":
 
         df=load_years_data(parameter,selected_years)
 
+        # ===== nearest grid =====
+        coords=df[["lat","lon"]].drop_duplicates().values
+        tree=cKDTree(coords)
+
+        dist,idx=tree.query([lat_input,lon_input])
+        nearest_lat,nearest_lon=coords[idx]
+
+        df=df[(df["lat"]==nearest_lat)&(df["lon"]==nearest_lon)]
+
         min_date=df["date"].min()
         max_date=df["date"].max()
 
@@ -304,7 +323,14 @@ elif st.session_state.page=="dashboard":
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
         st.subheader("Tabular Data")
-        st.dataframe(df)
+
+        # ===== prevent 200MB error =====
+        preview_rows=5000
+        if len(df)>preview_rows:
+            st.warning(f"Showing first {preview_rows} rows only")
+            st.dataframe(df.head(preview_rows))
+        else:
+            st.dataframe(df)
 
         csv=df.to_csv(index=False).encode('utf-8')
 
