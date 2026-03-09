@@ -43,14 +43,19 @@ st.sidebar.header("Filters")
 
 if "parameter" not in st.session_state:
     st.session_state.parameter = "rain"
+
 if "lat" not in st.session_state:
     st.session_state.lat = ""
+
 if "lon" not in st.session_state:
     st.session_state.lon = ""
+
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
+
 if "start_date" not in st.session_state:
     st.session_state.start_date = None
+
 if "end_date" not in st.session_state:
     st.session_state.end_date = None
 
@@ -61,6 +66,7 @@ parameter = st.sidebar.selectbox(
 
 config = GRID_CONFIG[parameter]
 
+# ================= DATA FILES =================
 data_folder = os.path.join("data", parameter)
 parquet_files = glob.glob(os.path.join(data_folder, "*.parquet"))
 
@@ -87,7 +93,9 @@ def load_years_data(parameter, years):
     df_list = []
 
     for year in years:
+
         file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
+
         df = pd.read_parquet(file)
 
         df["date"] = pd.to_datetime(df["date"])
@@ -102,7 +110,7 @@ def load_years_data(parameter, years):
 
 df = load_years_data(parameter, selected_years)
 
-# ================= BUILD KD TREE =================
+# ================= KD TREE =================
 @st.cache_resource
 def build_kdtree(dataframe):
 
@@ -135,26 +143,50 @@ if start_date > end_date:
     st.sidebar.error("Start Date must be before End Date")
     st.stop()
 
-# ================= LAT LON INPUT =================
-lat_input = st.sidebar.text_input("Enter Latitude", st.session_state.lat)
-lon_input = st.sidebar.text_input("Enter Longitude", st.session_state.lon)
+# ================= LOCATION INPUT METHOD =================
+st.sidebar.markdown("### Select Location Input Method")
 
-# ================= MAP SELECT =================
-st.sidebar.markdown("### Or Select Location on Map")
+location_method = st.sidebar.radio(
+    "Choose one option:",
+    ["Enter Latitude / Longitude", "Select Location on Map"]
+)
 
-m = folium.Map(location=[20.5937,78.9629], zoom_start=4)
+lat_input = ""
+lon_input = ""
 
-map_data = st_folium(m, height=350, width=300)
+# ===== OPTION 1 : MANUAL INPUT =====
+if location_method == "Enter Latitude / Longitude":
 
-if map_data and map_data["last_clicked"] is not None:
+    lat_input = st.sidebar.text_input(
+        "Enter Latitude",
+        st.session_state.lat
+    )
 
-    clicked_lat = map_data["last_clicked"]["lat"]
-    clicked_lon = map_data["last_clicked"]["lng"]
+    lon_input = st.sidebar.text_input(
+        "Enter Longitude",
+        st.session_state.lon
+    )
 
-    lat_input = str(round(clicked_lat,4))
-    lon_input = str(round(clicked_lon,4))
+# ===== OPTION 2 : MAP INPUT =====
+elif location_method == "Select Location on Map":
 
-    st.sidebar.write(f"Selected: {lat_input}, {lon_input}")
+    st.sidebar.markdown("Click on map to select location")
+
+    m = folium.Map(location=[20.5937,78.9629], zoom_start=4)
+
+    map_data = st_folium(m, height=350, width=300)
+
+    if map_data and map_data["last_clicked"] is not None:
+
+        clicked_lat = map_data["last_clicked"]["lat"]
+        clicked_lon = map_data["last_clicked"]["lng"]
+
+        lat_input = str(round(clicked_lat,4))
+        lon_input = str(round(clicked_lon,4))
+
+        st.sidebar.write(f"Selected Location:")
+        st.sidebar.write(f"Lat: {lat_input}")
+        st.sidebar.write(f"Lon: {lon_input}")
 
 # ================= BUTTONS =================
 submit_button = st.sidebar.button("Submit")
@@ -166,10 +198,9 @@ if reset_button:
     st.session_state.lon = ""
     st.session_state.start_date = None
     st.session_state.end_date = None
-    st.session_state.parameter = "rain"
     st.session_state.submitted = False
 
-    st.experimental_rerun()
+    st.rerun()
 
 if submit_button:
 
@@ -195,7 +226,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.error("Longitude outside IMD bounds.")
             st.stop()
 
-        # ===== SAFE DATE HANDLING =====
+        # SAFE DATE HANDLING
         start_date = st.session_state.start_date
         end_date = st.session_state.end_date
 
@@ -215,7 +246,7 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         epsilon = 1e-6
 
-        # ===== EXACT GRID CHECK =====
+        # EXACT GRID CHECK
         exact_row = date_filtered[
             (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
             (np.abs(date_filtered["lon"] - lon_val) < epsilon)
@@ -250,7 +281,6 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         # ================= TABS =================
         tabs = st.tabs(["Description","Tabular","Graphical"])
 
-        # ================= DESCRIPTION =================
         with tabs[0]:
 
             if grid_status == "Exact Grid Point Found":
@@ -272,13 +302,9 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
                 st.write("Resolution:", f"{config['resolution']}°")
                 st.write("Value:", value)
 
-        # ================= TABULAR =================
         with tabs[1]:
 
             st.subheader("Tabular Data")
-
-            st.write(f"Entered Location: ({lat_val}, {lon_val})")
-            st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
 
             all_data = date_filtered[
                 (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
@@ -288,25 +314,11 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             if all_data.empty:
                 st.warning("No historical data.")
             else:
-
                 st.dataframe(all_data)
 
-                csv = all_data.to_csv(index=False).encode('utf-8')
-
-                st.download_button(
-                    label="Download CSV",
-                    data=csv,
-                    file_name=f"{parameter}_{grid_lat}_{grid_lon}.csv",
-                    mime="text/csv"
-                )
-
-        # ================= GRAPH =================
         with tabs[2]:
 
             st.subheader("Graphical Data")
-
-            st.write(f"Entered Location: ({lat_val}, {lon_val})")
-            st.write(f"Grid Used: ({grid_lat}, {grid_lon})")
 
             if all_data.empty:
                 st.warning("No historical data.")
@@ -331,4 +343,4 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
         st.error("Latitude and Longitude must be numeric.")
 
 else:
-    st.info("Enter latitude and longitude and click Submit to fetch data.")
+    st.info("Enter location and click Submit to fetch data.")
