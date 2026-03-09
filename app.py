@@ -17,7 +17,6 @@ img {border-radius:0px !important;}
 </style>
 """, unsafe_allow_html=True)
 
-
 # ================= COLOR FUNCTIONS =================
 def rain_color(val):
     if pd.isna(val):
@@ -32,7 +31,6 @@ def rain_color(val):
         return "#C6DBEF"
     else:
         return "#F7FBFF"
-
 
 def temp_color(val):
     if pd.isna(val):
@@ -50,11 +48,12 @@ def temp_color(val):
     else:
         return "#31A354"
 
-
-# ================= DRAW INDIA GRID =================
+# ================= FAST GRID DRAW =================
 def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
 
     df_day = df[df["date"] == pd.to_datetime(selected_date)]
+
+    features = []
 
     for _, row in df_day.iterrows():
 
@@ -62,29 +61,45 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         lon = row["lon"]
         value = row[parameter]
 
-        bounds = [
-            [lat-resolution/2, lon-resolution/2],
-            [lat+resolution/2, lon+resolution/2]
-        ]
-
         color = rain_color(value) if parameter == "rain" else temp_color(value)
 
-        popup = f"""
-        Lat: {lat}<br>
-        Lon: {lon}<br>
-        {parameter}: {value}
-        """
+        polygon = [
+            [lon-resolution/2, lat-resolution/2],
+            [lon+resolution/2, lat-resolution/2],
+            [lon+resolution/2, lat+resolution/2],
+            [lon-resolution/2, lat+resolution/2],
+            [lon-resolution/2, lat-resolution/2]
+        ]
 
-        folium.Rectangle(
-            bounds=bounds,
-            color="black",
-            weight=0.3,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.7,
-            popup=popup
-        ).add_to(map_obj)
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "popup": f"Lat: {lat}<br>Lon: {lon}<br>{parameter}: {value}",
+                "style": {
+                    "fillColor": color,
+                    "color": "black",
+                    "weight": 0.3,
+                    "fillOpacity": 0.7
+                }
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [polygon]
+            }
+        }
 
+        features.append(feature)
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features
+    }
+
+    folium.GeoJson(
+        geojson,
+        style_function=lambda x: x["properties"]["style"],
+        popup=folium.GeoJsonPopup(fields=["popup"])
+    ).add_to(map_obj)
 
 # ================= SESSION STATE =================
 if "page" not in st.session_state:
@@ -99,21 +114,20 @@ if "submitted" not in st.session_state:
 if "view_submit" not in st.session_state:
     st.session_state.view_submit = False
 
-
 # ======================================================
 # ======================= HOME PAGE ====================
 # ======================================================
 if st.session_state.page == "home":
 
-    col1, col2 = st.columns([8, 2])
+    col1, col2 = st.columns([8,2])
 
     with col1:
         st.title("Weather Dashboard")
 
     with col2:
-        logo_path = os.path.join("data", "logo.png")
+        logo_path = os.path.join("data","logo.png")
         if os.path.exists(logo_path):
-            st.image(logo_path, width=100)
+            st.image(logo_path,width=100)
 
     st.write("")
     st.write("")
@@ -122,205 +136,196 @@ if st.session_state.page == "home":
 
     with colA:
         if st.button("View IMD Gridded Weather Data"):
-            st.session_state.mode = "view"
-            st.session_state.page = "dashboard"
+            st.session_state.mode="view"
+            st.session_state.page="dashboard"
             st.rerun()
 
     with colB:
         if st.button("Download IMD Gridded Weather Data"):
-            st.session_state.mode = "download"
-            st.session_state.page = "dashboard"
+            st.session_state.mode="download"
+            st.session_state.page="dashboard"
             st.rerun()
-
 
 # ======================================================
 # ===================== DASHBOARD ======================
 # ======================================================
 elif st.session_state.page == "dashboard":
 
-    col1, col2 = st.columns([8, 2])
+    col1, col2 = st.columns([8,2])
 
     with col1:
         st.title("IMD Gridded Data")
 
     with col2:
-        logo_path = os.path.join("data", "logo.png")
+        logo_path = os.path.join("data","logo.png")
         if os.path.exists(logo_path):
-            st.image(logo_path, width=100)
+            st.image(logo_path,width=100)
 
     GRID_CONFIG = {
-        "rain": {"resolution": 0.25},
-        "tmax": {"resolution": 1.0},
-        "tmin": {"resolution": 1.0}
+        "rain":{"resolution":0.25},
+        "tmax":{"resolution":1.0},
+        "tmin":{"resolution":1.0}
     }
 
     st.sidebar.header("Filters")
 
     if st.sidebar.button("🏠 Home"):
-        st.session_state.page = "home"
+        st.session_state.page="home"
         st.rerun()
 
-    # Parameter
-    parameter = st.sidebar.selectbox("Select Parameter", ["rain", "tmax", "tmin"])
+    parameter = st.sidebar.selectbox("Select Parameter",["rain","tmax","tmin"])
 
-    data_folder = os.path.join("data", parameter)
-    parquet_files = glob.glob(os.path.join(data_folder, "*.parquet"))
+    data_folder=os.path.join("data",parameter)
+    parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
 
-    years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
+    years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
+# ======================================================
+# ====================== VIEW MODE =====================
+# ======================================================
+    if st.session_state.mode=="view":
 
-    # ======================================================
-    # ====================== VIEW MODE =====================
-    # ======================================================
-    if st.session_state.mode == "view":
+        selected_year=st.sidebar.selectbox("Select Year",years)
 
-        # Year
-        selected_year = st.sidebar.selectbox("Select Year", years)
+        file=glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
 
-        file = glob.glob(os.path.join("data", parameter, f"{selected_year}*.parquet"))[0]
+        df=pd.read_parquet(file)
 
-        df = pd.read_parquet(file)
+        df["date"]=pd.to_datetime(df["date"])
 
-        df["date"] = pd.to_datetime(df["date"])
+        min_date=df["date"].min()
+        max_date=df["date"].max()
 
-        # Date
-        min_date = df["date"].min()
-        max_date = df["date"].max()
-
-        selected_date = st.sidebar.date_input(
+        selected_date=st.sidebar.date_input(
             "Select Date",
             value=min_date,
             min_value=min_date,
             max_value=max_date
         )
 
-        # Latitude Longitude
-        lat_min = st.sidebar.text_input("Min Latitude")
-        lat_max = st.sidebar.text_input("Max Latitude")
+        lat_min=st.sidebar.text_input("Min Latitude")
+        lat_max=st.sidebar.text_input("Max Latitude")
+        lon_min=st.sidebar.text_input("Min Longitude")
+        lon_max=st.sidebar.text_input("Max Longitude")
 
-        lon_min = st.sidebar.text_input("Min Longitude")
-        lon_max = st.sidebar.text_input("Max Longitude")
-
-        submit_view = st.sidebar.button("Submit")
+        submit_view=st.sidebar.button("Submit")
 
         if submit_view:
-            st.session_state.view_submit = True
-            st.session_state.lat_min = lat_min
-            st.session_state.lat_max = lat_max
-            st.session_state.lon_min = lon_min
-            st.session_state.lon_max = lon_max
+            st.session_state.view_submit=True
+            st.session_state.lat_min=lat_min
+            st.session_state.lat_max=lat_max
+            st.session_state.lon_min=lon_min
+            st.session_state.lon_max=lon_max
 
         if st.session_state.view_submit:
 
-            lat_min = float(st.session_state.lat_min)
-            lat_max = float(st.session_state.lat_max)
-            lon_min = float(st.session_state.lon_min)
-            lon_max = float(st.session_state.lon_max)
+            lat_min=float(st.session_state.lat_min)
+            lat_max=float(st.session_state.lat_max)
+            lon_min=float(st.session_state.lon_min)
+            lon_max=float(st.session_state.lon_max)
 
-            df = df[
-                (df["lat"] >= lat_min) &
-                (df["lat"] <= lat_max) &
-                (df["lon"] >= lon_min) &
-                (df["lon"] <= lon_max)
+            df=df[
+                (df["lat"]>=lat_min)&
+                (df["lat"]<=lat_max)&
+                (df["lon"]>=lon_min)&
+                (df["lon"]<=lon_max)
             ]
 
-            resolution = GRID_CONFIG[parameter]["resolution"]
+            resolution=GRID_CONFIG[parameter]["resolution"]
 
-            center_lat = (lat_min + lat_max) / 2
-            center_lon = (lon_min + lon_max) / 2
+            center_lat=(lat_min+lat_max)/2
+            center_lon=(lon_min+lon_max)/2
 
-            map_obj = folium.Map(
-                location=[center_lat, center_lon],
+            map_obj=folium.Map(
+                location=[center_lat,center_lon],
                 zoom_start=6,
                 tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                 attr="Esri Satellite"
             )
 
-            draw_india_grid(map_obj, df, parameter, selected_date, resolution)
+            draw_india_grid(map_obj,df,parameter,selected_date,resolution)
 
-            st_folium(map_obj, height=650, width=1100)
+            st_folium(map_obj,height=650,width=1100)
 
         else:
             st.info("Select filters and click Submit to view map.")
 
+# ======================================================
+# ==================== DOWNLOAD MODE ===================
+# ======================================================
+    elif st.session_state.mode=="download":
 
-    # ======================================================
-    # ==================== DOWNLOAD MODE ===================
-    # ======================================================
-    elif st.session_state.mode == "download":
-
-        selected_years = st.sidebar.multiselect("Select Years", years, default=[years[0]])
+        selected_years=st.sidebar.multiselect("Select Years",years,default=[years[0]])
 
         @st.cache_data
-        def load_years_data(parameter, years):
+        def load_years_data(parameter,years):
 
-            df_list = []
+            df_list=[]
 
             for year in years:
-                file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
+                file=glob.glob(os.path.join("data",parameter,f"{year}*.parquet"))[0]
 
-                df = pd.read_parquet(file)
+                df=pd.read_parquet(file)
 
-                df["date"] = pd.to_datetime(df["date"])
-                df["lat"] = pd.to_numeric(df["lat"])
-                df["lon"] = pd.to_numeric(df["lon"])
+                df["date"]=pd.to_datetime(df["date"])
+                df["lat"]=pd.to_numeric(df["lat"])
+                df["lon"]=pd.to_numeric(df["lon"])
 
                 df_list.append(df)
 
             return pd.concat(df_list)
 
-        df = load_years_data(parameter, selected_years)
+        df=load_years_data(parameter,selected_years)
 
-        min_date = df["date"].min()
-        max_date = df["date"].max()
+        min_date=df["date"].min()
+        max_date=df["date"].max()
 
-        start_date = st.sidebar.date_input("Start Date", value=min_date)
-        end_date = st.sidebar.date_input("End Date", value=max_date)
+        start_date=st.sidebar.date_input("Start Date",value=min_date)
+        end_date=st.sidebar.date_input("End Date",value=max_date)
 
-        df = df[
-            (df["date"] >= pd.to_datetime(start_date)) &
-            (df["date"] <= pd.to_datetime(end_date))
+        df=df[
+            (df["date"]>=pd.to_datetime(start_date))&
+            (df["date"]<=pd.to_datetime(end_date))
         ]
 
         st.sidebar.markdown("### Enter Location")
 
-        lat_input = st.sidebar.text_input("Enter Latitude")
-        lon_input = st.sidebar.text_input("Enter Longitude")
+        lat_input=st.sidebar.text_input("Enter Latitude")
+        lon_input=st.sidebar.text_input("Enter Longitude")
 
-        submit_button = st.sidebar.button("Submit")
+        submit_button=st.sidebar.button("Submit")
 
         if submit_button:
-            st.session_state.submitted = True
-            st.session_state.lat_val = lat_input
-            st.session_state.lon_val = lon_input
+            st.session_state.submitted=True
+            st.session_state.lat_val=lat_input
+            st.session_state.lon_val=lon_input
 
         if st.session_state.submitted:
 
-            lat_val = float(st.session_state.lat_val)
-            lon_val = float(st.session_state.lon_val)
+            lat_val=float(st.session_state.lat_val)
+            lon_val=float(st.session_state.lon_val)
 
-            grid_points = df[["lat", "lon"]].drop_duplicates().values
+            grid_points=df[["lat","lon"]].drop_duplicates().values
 
-            tree = cKDTree(grid_points)
+            tree=cKDTree(grid_points)
 
-            dist, idx = tree.query([lat_val, lon_val])
+            dist,idx=tree.query([lat_val,lon_val])
 
-            grid_lat, grid_lon = grid_points[idx]
+            grid_lat,grid_lon=grid_points[idx]
 
-            epsilon = 1e-6
+            epsilon=1e-6
 
-            row = df[
-                (np.abs(df["lat"] - grid_lat) < epsilon) &
-                (np.abs(df["lon"] - grid_lon) < epsilon)
+            row=df[
+                (np.abs(df["lat"]-grid_lat)<epsilon)&
+                (np.abs(df["lon"]-grid_lon)<epsilon)
             ]
 
-            all_data = row.sort_values("date")
+            all_data=row.sort_values("date")
 
             st.subheader("Tabular Data")
-
             st.dataframe(all_data)
 
-            csv = all_data.to_csv(index=False).encode("utf-8")
+            csv=all_data.to_csv(index=False).encode("utf-8")
 
             st.download_button(
                 "Download CSV",
@@ -331,9 +336,9 @@ elif st.session_state.page == "dashboard":
 
             st.subheader("Graphical Data")
 
-            fig, ax = plt.subplots(figsize=(10, 4))
+            fig,ax=plt.subplots(figsize=(10,4))
 
-            ax.plot(all_data["date"], all_data[parameter], marker="x")
+            ax.plot(all_data["date"],all_data[parameter],marker="x")
 
             ax.set_xlabel("Date")
             ax.set_ylabel(parameter.capitalize())
