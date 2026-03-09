@@ -373,7 +373,7 @@ elif st.session_state.page=="dashboard":
                 legend_html = """
                 <div style="
                 position: fixed; 
-                bottom: 50px; left: 50px; width: 160px; height: 210px; 
+                bottom: 20px; left: 50px; width: 160px; height: 180px; 
                 background-color: white;
                 border:2px solid grey; z-index:9999; font-size:14px;
                 padding:10px;">
@@ -391,7 +391,7 @@ elif st.session_state.page=="dashboard":
                 legend_html = """
                 <div style="
                 position: fixed; 
-                bottom: 50px; left: 50px; width: 160px; height: 230px; 
+                bottom: 20px; left: 50px; width: 160px; height: 180px; 
                 background-color: white;
                 border:2px solid grey; z-index:9999; font-size:14px;
                 padding:10px;">
