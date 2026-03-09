@@ -102,24 +102,6 @@ elif st.session_state.page=="dashboard":
         st.session_state.page="home"
         st.rerun()
 
-    if "parameter" not in st.session_state:
-        st.session_state.parameter="rain"
-
-    if "lat" not in st.session_state:
-        st.session_state.lat=""
-
-    if "lon" not in st.session_state:
-        st.session_state.lon=""
-
-    if "submitted" not in st.session_state:
-        st.session_state.submitted=False
-
-    if "start_date" not in st.session_state:
-        st.session_state.start_date=None
-
-    if "end_date" not in st.session_state:
-        st.session_state.end_date=None
-
     parameter=st.sidebar.selectbox("Select Parameter",["rain","tmax","tmin"])
 
     config=GRID_CONFIG[parameter]
@@ -127,76 +109,85 @@ elif st.session_state.page=="dashboard":
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
 
-    if not parquet_files:
-        st.error("No parquet files found.")
-        st.stop()
-
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-    selected_years=st.sidebar.multiselect(
-    "Select Years",
-    years,
-    default=[years[0]]
-    )
+    # ================= VIEW MODE FILTER =================
+    if st.session_state.mode=="view":
 
-    if len(selected_years)>MAX_YEAR_SELECTION:
-        st.sidebar.error(f"Select maximum {MAX_YEAR_SELECTION} years")
-        st.stop()
+        selected_year=st.sidebar.selectbox("Select Year",years)
 
-    @st.cache_data
-    def load_years_data(parameter,years):
+        df=pd.read_parquet(
+            glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
+        )
 
-        df_list=[]
+        df["date"]=pd.to_datetime(df["date"])
 
-        for year in years:
+        min_date=df["date"].min()
+        max_date=df["date"].max()
 
-            file=glob.glob(os.path.join("data",parameter,f"{year}*.parquet"))[0]
+        selected_date=st.sidebar.date_input(
+        "Select Date",
+        value=min_date,
+        min_value=min_date,
+        max_value=max_date
+        )
 
-            df=pd.read_parquet(file)
+    # ================= DOWNLOAD MODE FILTER =================
+    else:
 
-            df["date"]=pd.to_datetime(df["date"])
-            df["lat"]=pd.to_numeric(df["lat"])
-            df["lon"]=pd.to_numeric(df["lon"])
+        selected_years=st.sidebar.multiselect(
+        "Select Years",
+        years,
+        default=[years[0]]
+        )
 
-            df_list.append(df)
+        if len(selected_years)>MAX_YEAR_SELECTION:
+            st.sidebar.error(f"Select maximum {MAX_YEAR_SELECTION} years")
+            st.stop()
 
-        df=pd.concat(df_list)
+        @st.cache_data
+        def load_years_data(parameter,years):
 
-        return df
+            df_list=[]
 
-    df=load_years_data(parameter,selected_years)
+            for year in years:
 
-    @st.cache_resource
-    def build_kdtree(dataframe):
+                file=glob.glob(os.path.join("data",parameter,f"{year}*.parquet"))[0]
 
-        grid_points=dataframe[["lat","lon"]].drop_duplicates().values
-        tree=cKDTree(grid_points)
+                df=pd.read_parquet(file)
 
-        return tree,grid_points
+                df["date"]=pd.to_datetime(df["date"])
+                df["lat"]=pd.to_numeric(df["lat"])
+                df["lon"]=pd.to_numeric(df["lon"])
 
-    tree,grid_points=build_kdtree(df)
+                df_list.append(df)
 
-    min_date=df["date"].min()
-    max_date=df["date"].max()
+            df=pd.concat(df_list)
 
-    start_date=st.sidebar.date_input(
-    "Start Date",
-    value=st.session_state.start_date or min_date,
-    min_value=min_date,
-    max_value=max_date
-    )
+            return df
 
-    end_date=st.sidebar.date_input(
-    "End Date",
-    value=st.session_state.end_date or max_date,
-    min_value=min_date,
-    max_value=max_date
-    )
+        df=load_years_data(parameter,selected_years)
 
-    if start_date>end_date:
-        st.sidebar.error("Start Date must be before End Date")
-        st.stop()
+        min_date=df["date"].min()
+        max_date=df["date"].max()
 
+        start_date=st.sidebar.date_input(
+        "Start Date",
+        value=min_date,
+        min_value=min_date,
+        max_value=max_date
+        )
+
+        end_date=st.sidebar.date_input(
+        "End Date",
+        value=max_date,
+        min_value=min_date,
+        max_value=max_date
+        )
+
+        df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
+
+    # ================= LOCATION =================
     st.sidebar.markdown("### Select Location Input Method")
 
     location_method=st.sidebar.radio(
@@ -209,88 +200,47 @@ elif st.session_state.page=="dashboard":
 
     if location_method=="Enter Latitude / Longitude":
 
-        lat_input=st.sidebar.text_input("Enter Latitude",st.session_state.lat)
-        lon_input=st.sidebar.text_input("Enter Longitude",st.session_state.lon)
+        lat_input=st.sidebar.text_input("Enter Latitude")
+        lon_input=st.sidebar.text_input("Enter Longitude")
 
-    elif location_method=="Select Location on Map":
+    else:
 
-        m=folium.Map(location=[20.5937,78.9629],zoom_start=4,tiles="Esri.WorldImagery",attr="Esri")
+        m=folium.Map(location=[20.5937,78.9629],zoom_start=4,tiles="Esri.WorldImagery")
 
         map_data=st_folium(m,height=500,width=900)
 
-        if map_data and map_data["last_clicked"] is not None:
+        if map_data and map_data["last_clicked"]:
 
             lat_input=str(round(map_data["last_clicked"]["lat"],4))
             lon_input=str(round(map_data["last_clicked"]["lng"],4))
 
-            st.sidebar.write("Selected Location:")
-            st.sidebar.write(f"Lat: {lat_input}")
-            st.sidebar.write(f"Lon: {lon_input}")
-
     submit_button=st.sidebar.button("Submit")
-    reset_button=st.sidebar.button("Reset")
 
-    if reset_button:
+    if submit_button and lat_input and lon_input:
 
-        st.session_state.lat=""
-        st.session_state.lon=""
-        st.session_state.start_date=None
-        st.session_state.end_date=None
-        st.session_state.submitted=False
+        lat_val=float(lat_input)
+        lon_val=float(lon_input)
 
-        st.rerun()
+        grid_points=df[["lat","lon"]].drop_duplicates().values
+        tree=cKDTree(grid_points)
 
-    if submit_button:
+        dist,idx=tree.query([lat_val,lon_val])
 
-        st.session_state.lat=lat_input
-        st.session_state.lon=lon_input
-        st.session_state.start_date=start_date
-        st.session_state.end_date=end_date
-        st.session_state.submitted=True
-
-    if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
-
-        lat_val=float(st.session_state.lat)
-        lon_val=float(st.session_state.lon)
-
-        start_date=pd.to_datetime(st.session_state.start_date)
-        end_date=pd.to_datetime(st.session_state.end_date)
-
-        date_filtered=df[
-        (df["date"]>=start_date)&
-        (df["date"]<=end_date)
-        ]
+        grid_lat,grid_lon=grid_points[idx]
 
         epsilon=1e-6
 
-        exact_row=date_filtered[
-        (np.abs(date_filtered["lat"]-lat_val)<epsilon)&
-        (np.abs(date_filtered["lon"]-lon_val)<epsilon)
+        row=df[
+        (np.abs(df["lat"]-grid_lat)<epsilon)&
+        (np.abs(df["lon"]-grid_lon)<epsilon)
         ]
-
-        if not exact_row.empty:
-
-            grid_status="Exact Grid Point Found"
-            grid_lat=lat_val
-            grid_lon=lon_val
-            row=exact_row
-
-        else:
-
-            dist,idx=tree.query([lat_val,lon_val])
-            grid_lat,grid_lon=grid_points[idx]
-
-            row=date_filtered[
-            (np.abs(date_filtered["lat"]-grid_lat)<epsilon)&
-            (np.abs(date_filtered["lon"]-grid_lon)<epsilon)
-            ]
-
-            grid_status="Nearest Grid Found"
-
-        value=row.iloc[0][parameter]
 
         # ================= VIEW MODE =================
         if st.session_state.mode=="view":
+
+            row=row[row["date"]==pd.to_datetime(selected_date)]
+
+            value=row.iloc[0][parameter]
 
             st.subheader("Description")
 
@@ -303,20 +253,17 @@ elif st.session_state.page=="dashboard":
                 st.write("Grid Longitude Used:",grid_lon)
 
             with col2:
-                st.write("Start Date:",start_date.date())
-                st.write("End Date:",end_date.date())
+                st.write("Date:",selected_date)
                 st.write("Resolution:",f"{config['resolution']}°")
                 st.write("Value:",value)
 
         # ================= DOWNLOAD MODE =================
-        elif st.session_state.mode=="download":
+        else:
 
-            all_data=date_filtered[
-            (np.abs(date_filtered["lat"]-grid_lat)<epsilon)&
-            (np.abs(date_filtered["lon"]-grid_lon)<epsilon)
-            ].sort_values("date")
+            all_data=row.sort_values("date")
 
             st.subheader("Tabular Data")
+
             st.dataframe(all_data)
 
             csv=all_data.to_csv(index=False).encode('utf-8')
