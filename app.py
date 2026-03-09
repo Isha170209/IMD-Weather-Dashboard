@@ -54,7 +54,7 @@ if st.session_state.page == "home":
     with col2:
         logo_path = os.path.join("data","logo.png")
         if os.path.exists(logo_path):
-            st.image(logo_path,width=100, height=200)
+            st.image(logo_path,width=100)
 
     st.write("")
     st.write("")
