@@ -31,10 +31,12 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
-
 # ================= COLOR FUNCTIONS =================
 
 def rain_color(val):
+
+    if pd.isna(val):
+        return "#ffffff"
 
     if val >= 200:
         return "#08306B"
@@ -49,6 +51,9 @@ def rain_color(val):
 
 
 def temp_color(val):
+
+    if pd.isna(val):
+        return "#ffffff"
 
     if val >= 40:
         return "#800026"
@@ -66,27 +71,42 @@ def temp_color(val):
 
 # ================= GRID DRAW FUNCTION =================
 
-def draw_grid_cells(map_obj, center_lat, center_lon, resolution, parameter, value, selected_date, n_cells=3):
+def draw_grid_cells(map_obj, df, center_lat, center_lon, resolution, parameter, selected_date, n_cells=3):
+
+    epsilon = 1e-6
 
     for i in range(-n_cells, n_cells+1):
         for j in range(-n_cells, n_cells+1):
 
-            lat = center_lat + i*resolution
-            lon = center_lon + j*resolution
+            lat = round(center_lat + i*resolution, 4)
+            lon = round(center_lon + j*resolution, 4)
 
             bounds = [
                 [lat-resolution/2, lon-resolution/2],
                 [lat+resolution/2, lon+resolution/2]
             ]
 
-            if parameter=="rain":
-                color=rain_color(value)
+            # Fetch value for THIS grid cell
+            row = df[
+                (np.abs(df["lat"]-lat) < epsilon) &
+                (np.abs(df["lon"]-lon) < epsilon) &
+                (df["date"] == pd.to_datetime(selected_date))
+            ]
+
+            if len(row) > 0:
+                value = row.iloc[0][parameter]
             else:
-                color=temp_color(value)
+                value = np.nan
+
+            # Color selection
+            if parameter == "rain":
+                color = rain_color(value)
+            else:
+                color = temp_color(value)
 
             popup_text=f"""
-            Grid Lat: {round(lat,4)}<br>
-            Grid Lon: {round(lon,4)}<br>
+            Grid Lat: {lat}<br>
+            Grid Lon: {lon}<br>
             {parameter.capitalize()}: {value}<br>
             Date: {selected_date}
             """
@@ -191,7 +211,6 @@ elif st.session_state.page=="dashboard":
 
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-
     # ================= VIEW MODE =================
 
     if st.session_state.mode=="view":
@@ -213,7 +232,6 @@ elif st.session_state.page=="dashboard":
         min_value=min_date,
         max_value=max_date
         )
-
 
     # ================= DOWNLOAD MODE =================
 
@@ -251,23 +269,8 @@ elif st.session_state.page=="dashboard":
         min_date=df["date"].min()
         max_date=df["date"].max()
 
-        start_date=st.sidebar.date_input(
-        "Start Date",
-        value=min_date,
-        min_value=min_date,
-        max_value=max_date
-        )
-
-        end_date=st.sidebar.date_input(
-        "End Date",
-        value=max_date,
-        min_value=min_date,
-        max_value=max_date
-        )
-
-        if start_date>end_date:
-            st.sidebar.error("Start date must be before end date")
-            st.stop()
+        start_date=st.sidebar.date_input("Start Date",value=min_date)
+        end_date=st.sidebar.date_input("End Date",value=max_date)
 
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
@@ -335,13 +338,9 @@ elif st.session_state.page=="dashboard":
         (np.abs(df["lon"]-grid_lon)<epsilon)
         ]
 
-
-        # ================= VIEW MODE =================
-
         if st.session_state.mode=="view":
 
             row=row[row["date"]==pd.to_datetime(selected_date)]
-
             value=row.iloc[0][parameter]
 
             st.subheader("Description")
@@ -370,29 +369,15 @@ elif st.session_state.page=="dashboard":
 
             draw_grid_cells(
                 grid_map,
+                df,
                 grid_lat,
                 grid_lon,
                 config["resolution"],
                 parameter,
-                value,
                 selected_date
             )
 
-            # highlight selected grid
-            folium.Rectangle(
-                bounds=[
-                    [grid_lat-config["resolution"]/2, grid_lon-config["resolution"]/2],
-                    [grid_lat+config["resolution"]/2, grid_lon+config["resolution"]/2]
-                ],
-                color="yellow",
-                weight=3,
-                fill=False
-            ).add_to(grid_map)
-
             st_folium(grid_map,height=500,width=900)
-
-
-        # ================= DOWNLOAD MODE =================
 
         else:
 
