@@ -124,7 +124,7 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         feature = {
             "type": "Feature",
             "properties": {
-                "Grid": f"Lat: {lat}<br>Lon: {lon}<br>{parameter}: {value}",
+                "Grid":<br>f"Lat: {lat}<br>Lon: {lon}<br>{parameter}: {value}",
                 "style": {
                     "fillColor": color,
                     "color": "black",
