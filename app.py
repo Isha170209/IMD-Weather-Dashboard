@@ -14,22 +14,9 @@ st.set_page_config(layout="wide")
 st.markdown("""
 <style>
 img {border-radius:0px !important;}
-
-.box{
-border:2px solid #4CAF50;
-padding:40px;
-text-align:center;
-font-size:26px;
-border-radius:8px;
-background:#f8f8f8;
-margin:20px;
-cursor:pointer;
-}
-.box:hover{
-background:#e8f5e9;
-}
 </style>
 """, unsafe_allow_html=True)
+
 
 # ================= COLOR FUNCTIONS =================
 
@@ -69,55 +56,43 @@ def temp_color(val):
         return "#31A354"
 
 
-# ================= GRID DRAW FUNCTION =================
+# ================= DRAW INDIA GRID =================
 
-def draw_grid_cells(map_obj, df, center_lat, center_lon, resolution, parameter, selected_date, n_cells=3):
+def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
 
-    epsilon = 1e-6
+    df_day=df[df["date"]==pd.to_datetime(selected_date)]
 
-    for i in range(-n_cells, n_cells+1):
-        for j in range(-n_cells, n_cells+1):
+    for _,row in df_day.iterrows():
 
-            lat = round(center_lat + i*resolution, 4)
-            lon = round(center_lon + j*resolution, 4)
+        lat=row["lat"]
+        lon=row["lon"]
+        value=row[parameter]
 
-            bounds = [
-                [lat-resolution/2, lon-resolution/2],
-                [lat+resolution/2, lon+resolution/2]
-            ]
+        bounds=[
+        [lat-resolution/2,lon-resolution/2],
+        [lat+resolution/2,lon+resolution/2]
+        ]
 
-            row = df[
-                (np.abs(df["lat"]-lat) < epsilon) &
-                (np.abs(df["lon"]-lon) < epsilon) &
-                (df["date"] == pd.to_datetime(selected_date))
-            ]
+        if parameter=="rain":
+            color=rain_color(value)
+        else:
+            color=temp_color(value)
 
-            if len(row) > 0:
-                value = row.iloc[0][parameter]
-            else:
-                value = np.nan
+        popup=f"""
+        Lat: {lat}<br>
+        Lon: {lon}<br>
+        {parameter}: {value}
+        """
 
-            if parameter == "rain":
-                color = rain_color(value)
-            else:
-                color = temp_color(value)
-
-            popup_text=f"""
-            Grid Lat: {lat}<br>
-            Grid Lon: {lon}<br>
-            {parameter.capitalize()}: {value}<br>
-            Date: {selected_date}
-            """
-
-            folium.Rectangle(
-                bounds=bounds,
-                color="black",
-                weight=1,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.7,
-                popup=popup_text
-            ).add_to(map_obj)
+        folium.Rectangle(
+        bounds=bounds,
+        color="black",
+        weight=0.3,
+        fill=True,
+        fill_color=color,
+        fill_opacity=0.7,
+        popup=popup
+        ).add_to(map_obj)
 
 
 # ================= SESSION STATE =================
@@ -130,12 +105,6 @@ if "mode" not in st.session_state:
 
 if "submitted" not in st.session_state:
     st.session_state.submitted=False
-
-if "lat_val" not in st.session_state:
-    st.session_state.lat_val=None
-
-if "lon_val" not in st.session_state:
-    st.session_state.lon_val=None
 
 
 # ======================================================
@@ -188,11 +157,13 @@ elif st.session_state.page=="dashboard":
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
 
+
     GRID_CONFIG={
-    "rain":{"resolution":0.25,"lat_min":6.5,"lat_max":38.5,"lon_min":66.5,"lon_max":100.0},
-    "tmax":{"resolution":1.0,"lat_min":7.5,"lat_max":37.5,"lon_min":67.5,"lon_max":97.5},
-    "tmin":{"resolution":1.0,"lat_min":7.5,"lat_max":37.5,"lon_min":67.5,"lon_max":97.5}
+    "rain":{"resolution":0.25},
+    "tmax":{"resolution":1.0},
+    "tmin":{"resolution":1.0}
     }
+
 
     st.sidebar.header("Filters")
 
@@ -200,15 +171,18 @@ elif st.session_state.page=="dashboard":
         st.session_state.page="home"
         st.rerun()
 
+
     parameter=st.sidebar.selectbox("Select Parameter",["rain","tmax","tmin"])
-    config=GRID_CONFIG[parameter]
 
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
+
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
 
-# ================= VIEW MODE =================
+# ======================================================
+# ====================== VIEW MODE =====================
+# ======================================================
 
     if st.session_state.mode=="view":
 
@@ -230,6 +204,57 @@ elif st.session_state.page=="dashboard":
         max_value=max_date
         )
 
+        resolution=GRID_CONFIG[parameter]["resolution"]
+
+        map_obj=folium.Map(
+        location=[22.5,79],
+        zoom_start=5,
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri Satellite"
+        )
+
+        draw_india_grid(
+        map_obj,
+        df,
+        parameter,
+        selected_date,
+        resolution
+        )
+
+        # ===== Legend =====
+
+        if parameter=="rain":
+
+            legend_html="""
+            <div style="position: fixed; bottom: 20px; left: 50px;
+            background:white;border:2px solid grey;padding:10px;">
+            <b>Rainfall (mm)</b><br>
+            <i style="background:#08306B;width:18px;height:18px;float:left;margin-right:8px"></i>>200<br>
+            <i style="background:#2171B5;width:18px;height:18px;float:left;margin-right:8px"></i>100-200<br>
+            <i style="background:#6BAED6;width:18px;height:18px;float:left;margin-right:8px"></i>50-100<br>
+            <i style="background:#C6DBEF;width:18px;height:18px;float:left;margin-right:8px"></i>10-50<br>
+            <i style="background:#F7FBFF;width:18px;height:18px;float:left;margin-right:8px"></i><10
+            </div>
+            """
+
+        else:
+
+            legend_html="""
+            <div style="position: fixed; bottom: 20px; left: 50px;
+            background:white;border:2px solid grey;padding:10px;">
+            <b>Temperature (°C)</b><br>
+            <i style="background:#800026;width:18px;height:18px;float:left;margin-right:8px"></i>>=40<br>
+            <i style="background:#BD0026;width:18px;height:18px;float:left;margin-right:8px"></i>35-40<br>
+            <i style="background:#FC4E2A;width:18px;height:18px;float:left;margin-right:8px"></i>30-35<br>
+            <i style="background:#FD8D3C;width:18px;height:18px;float:left;margin-right:8px"></i>25-30<br>
+            <i style="background:#FEB24C;width:18px;height:18px;float:left;margin-right:8px"></i>20-25<br>
+            <i style="background:#31A354;width:18px;height:18px;float:left;margin-right:8px"></i><20
+            </div>
+            """
+
+        map_obj.get_root().html.add_child(folium.Element(legend_html))
+
+        st_folium(map_obj,height=650,width=1100)
 
 # ================= DOWNLOAD MODE =================
 
