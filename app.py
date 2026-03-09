@@ -31,7 +31,7 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
-# ================= GRID MAP FUNCTION =================
+# ================= GRID CELL DRAW FUNCTION =================
 def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
 
     for i in range(-n_cells, n_cells+1):
@@ -54,12 +54,21 @@ def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
                 popup=f"Grid Lat: {round(lat,4)} | Grid Lon: {round(lon,4)}"
             ).add_to(map_obj)
 
-# ================= PAGE STATE =================
+# ================= SESSION STATE =================
 if "page" not in st.session_state:
     st.session_state.page="home"
 
 if "mode" not in st.session_state:
     st.session_state.mode="view"
+
+if "submitted" not in st.session_state:
+    st.session_state.submitted=False
+
+if "lat_val" not in st.session_state:
+    st.session_state.lat_val=None
+
+if "lon_val" not in st.session_state:
+    st.session_state.lon_val=None
 
 # ======================================================
 # ======================= HOME PAGE ====================
@@ -116,9 +125,6 @@ elif st.session_state.page=="dashboard":
     "tmin":{"resolution":1.0,"lat_min":7.5,"lat_max":37.5,"lon_min":67.5,"lon_max":97.5}
     }
 
-    MAX_YEAR_SELECTION=5
-
-    # ================= SIDEBAR =================
     st.sidebar.header("Filters")
 
     if st.sidebar.button("🏠 Home"):
@@ -216,10 +222,16 @@ elif st.session_state.page=="dashboard":
 
     submit_button=st.sidebar.button("Submit")
 
-    if submit_button and lat_input and lon_input:
+    if submit_button:
+        st.session_state.submitted=True
+        st.session_state.lat_val=lat_input
+        st.session_state.lon_val=lon_input
 
-        lat_val=float(lat_input)
-        lon_val=float(lon_input)
+    # ================= MAIN OUTPUT =================
+    if st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
+
+        lat_val=float(st.session_state.lat_val)
+        lon_val=float(st.session_state.lon_val)
 
         grid_points=df[["lat","lon"]].drop_duplicates().values
         tree=cKDTree(grid_points)
@@ -257,17 +269,16 @@ elif st.session_state.page=="dashboard":
                 st.write("Resolution:",f"{config['resolution']}°")
                 st.write("Value:",value)
 
-            # ================= GRID VISUALIZATION MAP =================
-
+            # ===== GRID MAP =====
             st.subheader("Grid Cell Visualization")
 
-            grid_map = folium.Map(
+            grid_map=folium.Map(
                 location=[grid_lat,grid_lon],
                 zoom_start=7,
                 tiles="CartoDB Positron"
             )
 
-            draw_grid_cells(grid_map,grid_lat,grid_lon,config["resolution"],n_cells=3)
+            draw_grid_cells(grid_map,grid_lat,grid_lon,config["resolution"],3)
 
             st_folium(grid_map,height=500,width=900)
 
@@ -277,7 +288,6 @@ elif st.session_state.page=="dashboard":
             all_data=row.sort_values("date")
 
             st.subheader("Tabular Data")
-
             st.dataframe(all_data)
 
             csv=all_data.to_csv(index=False).encode('utf-8')
