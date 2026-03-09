@@ -69,46 +69,57 @@ def temp_color(val):
         return "#31A354"
 
 
-# ================= DRAW PAN INDIA GRID =================
+# ================= GRID DRAW FUNCTION =================
 
-def draw_pan_india_grid(map_obj, df, parameter, selected_date, resolution):
+def draw_grid_cells(map_obj, df, center_lat, center_lon, resolution, parameter, selected_date, n_cells=3):
 
     epsilon = 1e-6
 
-    df_day = df[df["date"] == pd.to_datetime(selected_date)]
+    for i in range(-n_cells, n_cells+1):
+        for j in range(-n_cells, n_cells+1):
 
-    for _, row in df_day.iterrows():
+            lat = round(center_lat + i*resolution, 4)
+            lon = round(center_lon + j*resolution, 4)
 
-        lat=row["lat"]
-        lon=row["lon"]
-        value=row[parameter]
+            bounds = [
+                [lat-resolution/2, lon-resolution/2],
+                [lat+resolution/2, lon+resolution/2]
+            ]
 
-        bounds=[
-            [lat-resolution/2, lon-resolution/2],
-            [lat+resolution/2, lon+resolution/2]
-        ]
+            # Fetch value for THIS grid cell
+            row = df[
+                (np.abs(df["lat"]-lat) < epsilon) &
+                (np.abs(df["lon"]-lon) < epsilon) &
+                (df["date"] == pd.to_datetime(selected_date))
+            ]
 
-        if parameter=="rain":
-            color=rain_color(value)
-        else:
-            color=temp_color(value)
+            if len(row) > 0:
+                value = row.iloc[0][parameter]
+            else:
+                value = np.nan
 
-        popup=f"""
-        Grid Lat: {lat}<br>
-        Grid Lon: {lon}<br>
-        {parameter.capitalize()}: {value}<br>
-        Date: {selected_date}
-        """
+            # Color selection
+            if parameter == "rain":
+                color = rain_color(value)
+            else:
+                color = temp_color(value)
 
-        folium.Rectangle(
-            bounds=bounds,
-            color="black",
-            weight=0.3,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.7,
-            popup=popup
-        ).add_to(map_obj)
+            popup_text=f"""
+            Grid Lat: {lat}<br>
+            Grid Lon: {lon}<br>
+            {parameter.capitalize()}: {value}<br>
+            Date: {selected_date}
+            """
+
+            folium.Rectangle(
+                bounds=bounds,
+                color="black",
+                weight=1,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.7,
+                popup=popup_text
+            ).add_to(map_obj)
 
 
 # ================= SESSION STATE =================
@@ -121,6 +132,13 @@ if "mode" not in st.session_state:
 
 if "submitted" not in st.session_state:
     st.session_state.submitted=False
+
+if "lat_val" not in st.session_state:
+    st.session_state.lat_val=None
+
+if "lon_val" not in st.session_state:
+    st.session_state.lon_val=None
+
 
 # ======================================================
 # ======================= HOME PAGE ====================
@@ -173,9 +191,9 @@ elif st.session_state.page=="dashboard":
             st.image(logo_path,width=100)
 
     GRID_CONFIG={
-    "rain":{"resolution":0.25},
-    "tmax":{"resolution":1.0},
-    "tmin":{"resolution":1.0}
+    "rain":{"resolution":0.25,"lat_min":6.5,"lat_max":38.5,"lon_min":66.5,"lon_max":100.0},
+    "tmax":{"resolution":1.0,"lat_min":7.5,"lat_max":37.5,"lon_min":67.5,"lon_max":97.5},
+    "tmin":{"resolution":1.0,"lat_min":7.5,"lat_max":37.5,"lon_min":67.5,"lon_max":97.5}
     }
 
     st.sidebar.header("Filters")
@@ -214,69 +232,6 @@ elif st.session_state.page=="dashboard":
         min_value=min_date,
         max_value=max_date
         )
-
-        submit_button=st.sidebar.button("Submit")
-
-        # ===== BLANK MAP =====
-
-        base_map=folium.Map(
-        location=[22.5,79],
-        zoom_start=5,
-        tiles="CartoDB positron"
-        )
-
-        if submit_button:
-
-            draw_pan_india_grid(
-                base_map,
-                df,
-                parameter,
-                selected_date,
-                config["resolution"]
-            )
-
-            # ================= LEGEND =================
-
-            if parameter == "rain":
-
-                legend_html = """
-                <div style="
-                position: fixed; 
-                bottom: 20px; left: 50px; width: 160px; height: 180px; 
-                background-color: white;
-                border:2px solid grey; z-index:9999; font-size:14px;
-                padding:10px;">
-                <b>Rainfall (mm)</b><br>
-                <i style="background:#08306B;width:18px;height:18px;float:left;margin-right:8px"></i>>200<br>
-                <i style="background:#2171B5;width:18px;height:18px;float:left;margin-right:8px"></i>100-200<br>
-                <i style="background:#6BAED6;width:18px;height:18px;float:left;margin-right:8px"></i>50-100<br>
-                <i style="background:#C6DBEF;width:18px;height:18px;float:left;margin-right:8px"></i>10-50<br>
-                <i style="background:#F7FBFF;width:18px;height:18px;float:left;margin-right:8px"></i><10
-                </div>
-                """
-
-            else:
-
-                legend_html = """
-                <div style="
-                position: fixed; 
-                bottom: 20px; left: 50px; width: 160px; height: 180px; 
-                background-color: white;
-                border:2px solid grey; z-index:9999; font-size:14px;
-                padding:10px;">
-                <b>Temperature (°C)</b><br>
-                <i style="background:#800026;width:18px;height:18px;float:left;margin-right:8px"></i>>=40<br>
-                <i style="background:#BD0026;width:18px;height:18px;float:left;margin-right:8px"></i>35-40<br>
-                <i style="background:#FC4E2A;width:18px;height:18px;float:left;margin-right:8px"></i>30-35<br>
-                <i style="background:#FD8D3C;width:18px;height:18px;float:left;margin-right:8px"></i>25-30<br>
-                <i style="background:#FEB24C;width:18px;height:18px;float:left;margin-right:8px"></i>20-25<br>
-                <i style="background:#31A354;width:18px;height:18px;float:left;margin-right:8px"></i><20
-                </div>
-                """
-
-            base_map.get_root().html.add_child(folium.Element(legend_html))
-
-        st_folium(base_map,height=650,width=1100)
 
     # ================= DOWNLOAD MODE =================
 
@@ -319,24 +274,183 @@ elif st.session_state.page=="dashboard":
 
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
-        st.subheader("Tabular Data")
-        st.dataframe(df)
 
-        csv=df.to_csv(index=False).encode('utf-8')
+    # ================= LOCATION =================
 
-        st.download_button(
-        "Download CSV",
-        csv,
-        "imd_gridded_weather_data.csv",
-        "text/csv"
+    st.sidebar.markdown("### Select Location Input Method")
+
+    location_method=st.sidebar.radio(
+    "Choose one option:",
+    ["Enter Latitude / Longitude","Select Location on Map"]
+    )
+
+    lat_input=""
+    lon_input=""
+
+    if location_method=="Enter Latitude / Longitude":
+
+        lat_input=st.sidebar.text_input("Enter Latitude")
+        lon_input=st.sidebar.text_input("Enter Longitude")
+
+    else:
+
+        m=folium.Map(
+        location=[20.5937,78.9629],
+        zoom_start=4,
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri Satellite"
         )
 
-        st.subheader("Graphical Data")
+        map_data=st_folium(m,height=500,width=900)
 
-        fig,ax=plt.subplots(figsize=(10,4))
-        ax.plot(df["date"],df[parameter],marker='x')
-        ax.set_xlabel("Date")
-        ax.set_ylabel(parameter.capitalize())
-        ax.grid(True)
+        if map_data and map_data["last_clicked"]:
 
-        st.pyplot(fig)
+            lat_input=str(round(map_data["last_clicked"]["lat"],4))
+            lon_input=str(round(map_data["last_clicked"]["lng"],4))
+
+
+    submit_button=st.sidebar.button("Submit")
+
+    if submit_button:
+        st.session_state.submitted=True
+        st.session_state.lat_val=lat_input
+        st.session_state.lon_val=lon_input
+
+
+    # ================= MAIN OUTPUT =================
+
+    if st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
+
+        lat_val=float(st.session_state.lat_val)
+        lon_val=float(st.session_state.lon_val)
+
+        grid_points=df[["lat","lon"]].drop_duplicates().values
+        tree=cKDTree(grid_points)
+
+        dist,idx=tree.query([lat_val,lon_val])
+
+        grid_lat,grid_lon=grid_points[idx]
+
+        epsilon=1e-6
+
+        row=df[
+        (np.abs(df["lat"]-grid_lat)<epsilon)&
+        (np.abs(df["lon"]-grid_lon)<epsilon)
+        ]
+
+        if st.session_state.mode=="view":
+
+            row=row[row["date"]==pd.to_datetime(selected_date)]
+            value=row.iloc[0][parameter]
+
+            st.subheader("Description")
+
+            col1,col2=st.columns(2)
+
+            with col1:
+                st.write("Entered Latitude:",lat_val)
+                st.write("Entered Longitude:",lon_val)
+                st.write("Grid Latitude Used:",grid_lat)
+                st.write("Grid Longitude Used:",grid_lon)
+
+            with col2:
+                st.write("Date:",selected_date)
+                st.write("Resolution:",f"{config['resolution']}°")
+                st.write("Value:",value)
+
+            st.subheader("Grid Cell Visualization")
+
+            grid_map=folium.Map(
+                location=[grid_lat,grid_lon],
+                zoom_start=7,
+                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attr="Esri Satellite"
+            )
+            # ================= LEGEND =================
+
+            if parameter == "rain":
+
+                legend_html = """
+                <div style="
+                position: fixed; 
+                bottom: 20px; left: 50px; width: 160px; height: 180px; 
+                background-color: white;
+                border:2px solid grey; z-index:9999; font-size:14px;
+                padding:10px;">
+                <b>Rainfall (mm)</b><br>
+                <i style="background:#08306B;width:18px;height:18px;float:left;margin-right:8px"></i>>200<br>
+                <i style="background:#2171B5;width:18px;height:18px;float:left;margin-right:8px"></i>100-200<br>
+                <i style="background:#6BAED6;width:18px;height:18px;float:left;margin-right:8px"></i>50-100<br>
+                <i style="background:#C6DBEF;width:18px;height:18px;float:left;margin-right:8px"></i>10-50<br>
+                <i style="background:#F7FBFF;width:18px;height:18px;float:left;margin-right:8px"></i><10
+                </div>
+                """
+
+            else:
+
+                legend_html = """
+                <div style="
+                position: fixed; 
+                bottom: 20px; left: 50px; width: 160px; height: 180px; 
+                background-color: white;
+                border:2px solid grey; z-index:9999; font-size:14px;
+                padding:10px;">
+                <b>Temperature (°C)</b><br>
+                <i style="background:#800026;width:18px;height:18px;float:left;margin-right:8px"></i>>=40<br>
+                <i style="background:#BD0026;width:18px;height:18px;float:left;margin-right:8px"></i>35-40<br>
+                <i style="background:#FC4E2A;width:18px;height:18px;float:left;margin-right:8px"></i>30-35<br>
+                <i style="background:#FD8D3C;width:18px;height:18px;float:left;margin-right:8px"></i>25-30<br>
+                <i style="background:#FEB24C;width:18px;height:18px;float:left;margin-right:8px"></i>20-25<br>
+                <i style="background:#31A354;width:18px;height:18px;float:left;margin-right:8px"></i><20
+                </div>
+                """
+
+            grid_map.get_root().html.add_child(folium.Element(legend_html))
+
+            draw_grid_cells(
+                grid_map,
+                df,
+                grid_lat,
+                grid_lon,
+                config["resolution"],
+                parameter,
+                selected_date
+            )
+
+            st_folium(grid_map,height=500,width=900)
+
+        else:
+
+            all_data=row.sort_values("date")
+
+            st.subheader("Tabular Data")
+            st.dataframe(all_data)
+
+            csv=all_data.to_csv(index=False).encode('utf-8')
+
+            st.download_button(
+            "Download CSV",
+            csv,
+            "imd_gridded_weather_data.csv",
+            "text/csv"
+            )
+
+            st.subheader("Graphical Data")
+
+            fig,ax=plt.subplots(figsize=(10,4))
+
+            ax.plot(all_data["date"],all_data[parameter],marker='x')
+
+            ax.set_xlabel("Date")
+            ax.set_ylabel(parameter.capitalize())
+
+            ax.set_title(
+            f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
+            )
+
+            ax.grid(True)
+
+            st.pyplot(fig)
+
+    else:
+        st.info("Enter location and click Submit to fetch data.")
