@@ -148,7 +148,7 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
     folium.GeoJson(
         geojson,
         style_function=lambda x: x["properties"]["style"],
-        popup=folium.GeoJsonPopup(fields=["popup"])
+        popup=folium.GeoJsonPopup(fields=["Grid"])
     ).add_to(map_obj)
 
 # ================= SESSION STATE =================
