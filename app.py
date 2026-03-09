@@ -79,7 +79,7 @@ if st.session_state.page=="home":
     col1,col2=st.columns([8,2])
 
     with col1:
-        st.title("Dashboard")
+        st.title("Weather Dashboard")
 
     with col2:
         logo_path=os.path.join("data","logo.png")
@@ -112,7 +112,7 @@ elif st.session_state.page=="dashboard":
     col1,col2=st.columns([8,2])
 
     with col1:
-        st.title("Weather Data Dashboard")
+        st.title("IMD Gridded Data")
 
     with col2:
         logo_path=os.path.join("data","logo.png")
