@@ -51,41 +51,24 @@ def temp_color(val):
         return "#31A354"
 
 
-# ================= STATE BOUNDARIES (Bounding Box) =================
+# ================= DRAW GRID =================
 
-STATE_BOUNDS = {
-    "All India":[6,38,68,98],
-    "Maharashtra":[15.5,22.5,72,81],
-    "Gujarat":[20,24.7,68,74.5],
-    "Rajasthan":[23,30.5,69.5,78.5],
-    "Madhya Pradesh":[21,26.5,74,82],
-    "Karnataka":[11.5,18.5,74,78.5],
-    "Telangana":[15.5,19.5,77,81],
-    "Andhra Pradesh":[12,19,77,85],
-    "Tamil Nadu":[8,13.5,76,80.5],
-    "Uttar Pradesh":[23.5,30.5,77,84]
-}
+def draw_india_grid(map_obj, df, parameter, resolution):
 
-# ================= DRAW INDIA GRID =================
+    for _, row in df.iterrows():
 
-def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
+        lat=row["lat"]
+        lon=row["lon"]
+        value=row[parameter]
 
-    df_day = df[df["date"] == pd.to_datetime(selected_date)]
-
-    for _, row in df_day.iterrows():
-
-        lat = row["lat"]
-        lon = row["lon"]
-        value = row[parameter]
-
-        bounds = [
+        bounds=[
             [lat-resolution/2, lon-resolution/2],
             [lat+resolution/2, lon+resolution/2]
         ]
 
-        color = rain_color(value) if parameter == "rain" else temp_color(value)
+        color = rain_color(value) if parameter=="rain" else temp_color(value)
 
-        popup = f"""
+        popup=f"""
         Lat: {lat}<br>
         Lon: {lon}<br>
         {parameter}: {value}
@@ -94,7 +77,7 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         folium.Rectangle(
             bounds=bounds,
             color="black",
-            weight=0.3,
+            weight=0.4,
             fill=True,
             fill_color=color,
             fill_opacity=0.7,
@@ -102,41 +85,77 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         ).add_to(map_obj)
 
 
+# ================= LEGEND =================
+
+def add_legend(map_obj,parameter):
+
+    if parameter=="rain":
+
+        legend_html="""
+        <div style='position: fixed; 
+        bottom: 50px; left: 50px; width: 150px; height: 170px; 
+        background-color: white; border:2px solid grey; z-index:9999;
+        font-size:14px; padding:10px'>
+        <b>Rainfall (mm)</b><br>
+        <i style="background:#08306B;width:10px;height:10px;display:inline-block"></i> >200<br>
+        <i style="background:#2171B5;width:10px;height:10px;display:inline-block"></i> 100-200<br>
+        <i style="background:#6BAED6;width:10px;height:10px;display:inline-block"></i> 50-100<br>
+        <i style="background:#C6DBEF;width:10px;height:10px;display:inline-block"></i> 10-50<br>
+        <i style="background:#F7FBFF;width:10px;height:10px;display:inline-block"></i> <10
+        </div>
+        """
+
+    else:
+
+        legend_html="""
+        <div style='position: fixed; 
+        bottom: 50px; left: 50px; width: 150px; height: 170px; 
+        background-color: white; border:2px solid grey; z-index:9999;
+        font-size:14px; padding:10px'>
+        <b>Temperature</b><br>
+        <i style="background:#800026;width:10px;height:10px;display:inline-block"></i> >40<br>
+        <i style="background:#BD0026;width:10px;height:10px;display:inline-block"></i> 35-40<br>
+        <i style="background:#FC4E2A;width:10px;height:10px;display:inline-block"></i> 30-35<br>
+        <i style="background:#FD8D3C;width:10px;height:10px;display:inline-block"></i> 25-30<br>
+        <i style="background:#FEB24C;width:10px;height:10px;display:inline-block"></i> 20-25
+        </div>
+        """
+
+    map_obj.get_root().html.add_child(folium.Element(legend_html))
+
+
 # ================= SESSION STATE =================
 
 if "page" not in st.session_state:
-    st.session_state.page = "home"
+    st.session_state.page="home"
 
 if "mode" not in st.session_state:
-    st.session_state.mode = "view"
-
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
+    st.session_state.mode="view"
 
 if "submitted_view" not in st.session_state:
-    st.session_state.submitted_view = False
+    st.session_state.submitted_view=False
+
+if "submitted" not in st.session_state:
+    st.session_state.submitted=False
 
 
 # ======================================================
 # ======================= HOME PAGE ====================
 # ======================================================
 
-if st.session_state.page == "home":
+if st.session_state.page=="home":
 
-    col1, col2 = st.columns([8, 2])
+    col1,col2=st.columns([8,2])
 
     with col1:
         st.title("Weather Dashboard")
 
     with col2:
-        logo_path = os.path.join("data", "logo.png")
+        logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
-            st.image(logo_path, width=100)
+            st.image(logo_path,width=100)
 
-    st.write("")
-    st.write("")
-
-    colA, colB = st.columns(2)
+    colA,colB=st.columns(2)
 
     with colA:
         if st.button("View IMD Gridded Weather Data"):
@@ -157,16 +176,6 @@ if st.session_state.page == "home":
 
 elif st.session_state.page=="dashboard":
 
-    col1,col2=st.columns([8,2])
-
-    with col1:
-        st.title("IMD Gridded Data")
-
-    with col2:
-        logo_path=os.path.join("data","logo.png")
-        if os.path.exists(logo_path):
-            st.image(logo_path,width=100)
-
     GRID_CONFIG={
         "rain":{"resolution":0.25},
         "tmax":{"resolution":1.0},
@@ -183,7 +192,6 @@ elif st.session_state.page=="dashboard":
 
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
-
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
 # ======================================================
@@ -194,23 +202,21 @@ elif st.session_state.page=="dashboard":
 
         selected_year=st.sidebar.selectbox("Select Year",years)
 
-        selected_state=st.sidebar.selectbox(
-            "Select State",
-            list(STATE_BOUNDS.keys())
-        )
+        lat_input=st.sidebar.text_input("Enter Latitude")
+        lon_input=st.sidebar.text_input("Enter Longitude")
 
         submit_view=st.sidebar.button("Submit")
 
         if submit_view:
             st.session_state.submitted_view=True
-            st.session_state.state=selected_state
+            st.session_state.lat_val=lat_input
+            st.session_state.lon_val=lon_input
 
         if st.session_state.submitted_view:
 
             file=glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
 
             df=pd.read_parquet(file)
-
             df["date"]=pd.to_datetime(df["date"])
 
             min_date=df["date"].min()
@@ -223,45 +229,57 @@ elif st.session_state.page=="dashboard":
                 max_value=max_date
             )
 
-            bounds=STATE_BOUNDS[st.session_state.state]
+            df_day=df[df["date"]==pd.to_datetime(selected_date)]
 
-            min_lat,max_lat,min_lon,max_lon=bounds
+            lat_val=float(st.session_state.lat_val)
+            lon_val=float(st.session_state.lon_val)
 
-            df=df[
-                (df["lat"]>=min_lat)&
-                (df["lat"]<=max_lat)&
-                (df["lon"]>=min_lon)&
-                (df["lon"]<=max_lon)
-            ]
+            grid_points=df_day[["lat","lon"]].drop_duplicates().values
+
+            tree=cKDTree(grid_points)
+
+            dist,idx=tree.query([lat_val,lon_val])
+
+            grid_lat,grid_lon=grid_points[idx]
 
             resolution=GRID_CONFIG[parameter]["resolution"]
 
-            center_lat=(min_lat+max_lat)/2
-            center_lon=(min_lon+max_lon)/2
+            # select surrounding grids
+            buffer=resolution*2
+
+            df_subset=df_day[
+                (df_day["lat"]>=grid_lat-buffer)&
+                (df_day["lat"]<=grid_lat+buffer)&
+                (df_day["lon"]>=grid_lon-buffer)&
+                (df_day["lon"]<=grid_lon+buffer)
+            ]
 
             map_obj=folium.Map(
-                location=[center_lat,center_lon],
-                zoom_start=6
+                location=[grid_lat,grid_lon],
+                zoom_start=7
             )
 
-            # Satellite imagery
             folium.TileLayer(
                 tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                 attr="Esri Satellite",
                 name="Satellite"
             ).add_to(map_obj)
 
-            # Labels layer
             folium.TileLayer(
                 tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 name="Labels",
-                overlay=True,
-                control=True
+                overlay=True
             ).add_to(map_obj)
 
-            draw_india_grid(map_obj, df, parameter, selected_date, resolution)
+            draw_india_grid(map_obj,df_subset,parameter,resolution)
 
-            folium.LayerControl().add_to(map_obj)
+            add_legend(map_obj,parameter)
+
+            folium.Marker(
+                [lat_val,lon_val],
+                popup="Entered Location",
+                icon=folium.Icon(color="red")
+            ).add_to(map_obj)
 
             st_folium(map_obj,height=650,width=1100)
 
