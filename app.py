@@ -17,9 +17,9 @@ with col1:
     st.title("Weather Data Dashboard")
 
 with col2:
-    logo_path = os.path.join("data", "hdfc ergo logo.png")
+    logo_path = os.path.join("data", "logo.png")
     if os.path.exists(logo_path):
-        st.image(logo_path, width=120)
+        st.image(logo_path, width=100)
 
 # ================= GRID CONFIG =================
 GRID_CONFIG = {
