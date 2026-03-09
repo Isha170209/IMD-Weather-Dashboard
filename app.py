@@ -45,7 +45,7 @@ def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
                 [lat+resolution/2, lon+resolution/2]
             ]
 
-            folium.Square(
+            folium.Rectangle(
                 bounds=bounds,
                 color="yellow",
                 weight=1,
