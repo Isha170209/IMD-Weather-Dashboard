@@ -31,7 +31,7 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
-# ================= GRID CELL DRAW FUNCTION =================
+# ================= GRID DRAW FUNCTION =================
 def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
 
     for i in range(-n_cells, n_cells+1):
@@ -193,6 +193,29 @@ elif st.session_state.page=="dashboard":
 
         df=load_years_data(parameter,selected_years)
 
+        min_date=df["date"].min()
+        max_date=df["date"].max()
+
+        start_date=st.sidebar.date_input(
+        "Start Date",
+        value=min_date,
+        min_value=min_date,
+        max_value=max_date
+        )
+
+        end_date=st.sidebar.date_input(
+        "End Date",
+        value=max_date,
+        min_value=min_date,
+        max_value=max_date
+        )
+
+        if start_date>end_date:
+            st.sidebar.error("Start date must be before end date")
+            st.stop()
+
+        df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
+
     # ================= LOCATION =================
     st.sidebar.markdown("### Select Location Input Method")
 
@@ -269,7 +292,6 @@ elif st.session_state.page=="dashboard":
                 st.write("Resolution:",f"{config['resolution']}°")
                 st.write("Value:",value)
 
-            # ===== GRID MAP =====
             st.subheader("Grid Cell Visualization")
 
             grid_map=folium.Map(
