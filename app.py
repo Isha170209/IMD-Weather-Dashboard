@@ -31,8 +31,42 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
+
+# ================= COLOR FUNCTIONS =================
+
+def rain_color(val):
+
+    if val >= 200:
+        return "#08306B"
+    elif val >= 100:
+        return "#2171B5"
+    elif val >= 50:
+        return "#6BAED6"
+    elif val >= 10:
+        return "#C6DBEF"
+    else:
+        return "#F7FBFF"
+
+
+def temp_color(val):
+
+    if val >= 40:
+        return "#800026"
+    elif val >= 35:
+        return "#BD0026"
+    elif val >= 30:
+        return "#FC4E2A"
+    elif val >= 25:
+        return "#FD8D3C"
+    elif val >= 20:
+        return "#FEB24C"
+    else:
+        return "#31A354"
+
+
 # ================= GRID DRAW FUNCTION =================
-def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
+
+def draw_grid_cells(map_obj, center_lat, center_lon, resolution, parameter, value, selected_date, n_cells=3):
 
     for i in range(-n_cells, n_cells+1):
         for j in range(-n_cells, n_cells+1):
@@ -45,16 +79,31 @@ def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
                 [lat+resolution/2, lon+resolution/2]
             ]
 
+            if parameter=="rain":
+                color=rain_color(value)
+            else:
+                color=temp_color(value)
+
+            popup_text=f"""
+            Grid Lat: {round(lat,4)}<br>
+            Grid Lon: {round(lon,4)}<br>
+            {parameter.capitalize()}: {value}<br>
+            Date: {selected_date}
+            """
+
             folium.Rectangle(
                 bounds=bounds,
-                color="yellow",
+                color="black",
                 weight=1,
                 fill=True,
-                fill_opacity=0.1,
-                popup=f"Grid Lat: {round(lat,4)} | Grid Lon: {round(lon,4)}"
+                fill_color=color,
+                fill_opacity=0.7,
+                popup=popup_text
             ).add_to(map_obj)
 
+
 # ================= SESSION STATE =================
+
 if "page" not in st.session_state:
     st.session_state.page="home"
 
@@ -69,6 +118,7 @@ if "lat_val" not in st.session_state:
 
 if "lon_val" not in st.session_state:
     st.session_state.lon_val=None
+
 
 # ======================================================
 # ======================= HOME PAGE ====================
@@ -102,6 +152,7 @@ if st.session_state.page=="home":
             st.session_state.mode="download"
             st.session_state.page="dashboard"
             st.rerun()
+
 
 # ======================================================
 # ===================== DASHBOARD ======================
@@ -140,7 +191,9 @@ elif st.session_state.page=="dashboard":
 
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
+
     # ================= VIEW MODE =================
+
     if st.session_state.mode=="view":
 
         selected_year=st.sidebar.selectbox("Select Year",years)
@@ -161,7 +214,9 @@ elif st.session_state.page=="dashboard":
         max_value=max_date
         )
 
+
     # ================= DOWNLOAD MODE =================
+
     else:
 
         selected_years=st.sidebar.multiselect(
@@ -216,7 +271,9 @@ elif st.session_state.page=="dashboard":
 
         df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
 
+
     # ================= LOCATION =================
+
     st.sidebar.markdown("### Select Location Input Method")
 
     location_method=st.sidebar.radio(
@@ -234,7 +291,12 @@ elif st.session_state.page=="dashboard":
 
     else:
 
-        m=folium.Map(location=[20.5937,78.9629],zoom_start=4,tiles="Esri.WorldImagery")
+        m=folium.Map(
+        location=[20.5937,78.9629],
+        zoom_start=4,
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri Satellite"
+        )
 
         map_data=st_folium(m,height=500,width=900)
 
@@ -243,6 +305,7 @@ elif st.session_state.page=="dashboard":
             lat_input=str(round(map_data["last_clicked"]["lat"],4))
             lon_input=str(round(map_data["last_clicked"]["lng"],4))
 
+
     submit_button=st.sidebar.button("Submit")
 
     if submit_button:
@@ -250,7 +313,9 @@ elif st.session_state.page=="dashboard":
         st.session_state.lat_val=lat_input
         st.session_state.lon_val=lon_input
 
+
     # ================= MAIN OUTPUT =================
+
     if st.session_state.submitted and st.session_state.lat_val and st.session_state.lon_val:
 
         lat_val=float(st.session_state.lat_val)
@@ -270,7 +335,9 @@ elif st.session_state.page=="dashboard":
         (np.abs(df["lon"]-grid_lon)<epsilon)
         ]
 
+
         # ================= VIEW MODE =================
+
         if st.session_state.mode=="view":
 
             row=row[row["date"]==pd.to_datetime(selected_date)]
@@ -297,14 +364,36 @@ elif st.session_state.page=="dashboard":
             grid_map=folium.Map(
                 location=[grid_lat,grid_lon],
                 zoom_start=7,
-                tiles="CartoDB Positron"
+                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attr="Esri Satellite"
             )
 
-            draw_grid_cells(grid_map,grid_lat,grid_lon,config["resolution"],3)
+            draw_grid_cells(
+                grid_map,
+                grid_lat,
+                grid_lon,
+                config["resolution"],
+                parameter,
+                value,
+                selected_date
+            )
+
+            # highlight selected grid
+            folium.Rectangle(
+                bounds=[
+                    [grid_lat-config["resolution"]/2, grid_lon-config["resolution"]/2],
+                    [grid_lat+config["resolution"]/2, grid_lon+config["resolution"]/2]
+                ],
+                color="yellow",
+                weight=3,
+                fill=False
+            ).add_to(grid_map)
 
             st_folium(grid_map,height=500,width=900)
 
+
         # ================= DOWNLOAD MODE =================
+
         else:
 
             all_data=row.sort_values("date")
