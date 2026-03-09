@@ -16,333 +16,382 @@ st.markdown("""
 img {
     border-radius: 0px !important;
 }
+.home-box {
+    border:2px solid #4CAF50;
+    padding:40px;
+    text-align:center;
+    font-size:28px;
+    border-radius:10px;
+    background-color:#f9f9f9;
+    cursor:pointer;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ================= HEADER WITH LOGO =================
-col1, col2 = st.columns([8,2])
+# ================= SESSION STATE PAGE CONTROL =================
+if "page" not in st.session_state:
+    st.session_state.page = "home"
 
-with col1:
-    st.title("Weather Data Dashboard")
+# ================================================================
+# =========================== HOME PAGE ==========================
+# ================================================================
 
-with col2:
-    logo_path = os.path.join("data", "logo.png")
-    if os.path.exists(logo_path):
-        st.image(logo_path, width=100)
+if st.session_state.page == "home":
 
-# ================= GRID CONFIG =================
-GRID_CONFIG = {
-    "rain": {
-        "resolution": 0.25,
-        "lat_min": 6.5,
-        "lat_max": 38.5,
-        "lon_min": 66.5,
-        "lon_max": 100.0
-    },
-    "tmax": {
-        "resolution": 1.0,
-        "lat_min": 7.5,
-        "lat_max": 37.5,
-        "lon_min": 67.5,
-        "lon_max": 97.5
-    },
-    "tmin": {
-        "resolution": 1.0,
-        "lat_min": 7.5,
-        "lat_max": 37.5,
-        "lon_min": 67.5,
-        "lon_max": 97.5
+    col1, col2 = st.columns([8,2])
+
+    with col1:
+        st.title("Dashboard")
+
+    with col2:
+        logo_path = os.path.join("data","logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path,width=100)
+
+    st.write("")
+
+    st.markdown(
+        """
+        <div class="home-box">
+        View / Download IMD Gridded Weather Data
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if st.button("Open Dashboard"):
+
+        st.session_state.page = "dashboard"
+        st.rerun()
+
+# ================================================================
+# ======================== DASHBOARD PAGE ========================
+# ================================================================
+
+elif st.session_state.page == "dashboard":
+
+    # ================= HEADER WITH LOGO =================
+    col1, col2 = st.columns([8,2])
+
+    with col1:
+        st.title("Weather Data Dashboard")
+
+    with col2:
+        logo_path = os.path.join("data", "logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=100)
+
+    # ================= GRID CONFIG =================
+    GRID_CONFIG = {
+        "rain": {
+            "resolution": 0.25,
+            "lat_min": 6.5,
+            "lat_max": 38.5,
+            "lon_min": 66.5,
+            "lon_max": 100.0
+        },
+        "tmax": {
+            "resolution": 1.0,
+            "lat_min": 7.5,
+            "lat_max": 37.5,
+            "lon_min": 67.5,
+            "lon_max": 97.5
+        },
+        "tmin": {
+            "resolution": 1.0,
+            "lat_min": 7.5,
+            "lat_max": 37.5,
+            "lon_min": 67.5,
+            "lon_max": 97.5
+        }
     }
-}
 
-MAX_YEAR_SELECTION = 5
+    MAX_YEAR_SELECTION = 5
 
-# ================= SIDEBAR =================
-st.sidebar.header("Filters")
+    # ================= SIDEBAR =================
+    st.sidebar.header("Filters")
 
-if "parameter" not in st.session_state:
-    st.session_state.parameter = "rain"
+    # HOME BUTTON
+    if st.sidebar.button("🏠 Home"):
+        st.session_state.page = "home"
+        st.rerun()
 
-if "lat" not in st.session_state:
-    st.session_state.lat = ""
+    if "parameter" not in st.session_state:
+        st.session_state.parameter = "rain"
 
-if "lon" not in st.session_state:
-    st.session_state.lon = ""
+    if "lat" not in st.session_state:
+        st.session_state.lat = ""
 
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
+    if "lon" not in st.session_state:
+        st.session_state.lon = ""
 
-if "start_date" not in st.session_state:
-    st.session_state.start_date = None
+    if "submitted" not in st.session_state:
+        st.session_state.submitted = False
 
-if "end_date" not in st.session_state:
-    st.session_state.end_date = None
+    if "start_date" not in st.session_state:
+        st.session_state.start_date = None
 
-parameter = st.sidebar.selectbox(
-    "Select Parameter",
-    ["rain", "tmax", "tmin"]
-)
+    if "end_date" not in st.session_state:
+        st.session_state.end_date = None
 
-config = GRID_CONFIG[parameter]
-
-# ================= DATA FILES =================
-data_folder = os.path.join("data", parameter)
-parquet_files = glob.glob(os.path.join(data_folder, "*.parquet"))
-
-if not parquet_files:
-    st.error("No parquet files found.")
-    st.stop()
-
-years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
-
-selected_years = st.sidebar.multiselect(
-    "Select Years",
-    years,
-    default=[years[0]]
-)
-
-if len(selected_years) > MAX_YEAR_SELECTION:
-    st.sidebar.error(f"Select maximum {MAX_YEAR_SELECTION} years")
-    st.stop()
-
-# ================= LOAD DATA =================
-@st.cache_data
-def load_years_data(parameter, years):
-
-    df_list = []
-
-    for year in years:
-
-        file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
-
-        df = pd.read_parquet(file)
-
-        df["date"] = pd.to_datetime(df["date"])
-        df["lat"] = pd.to_numeric(df["lat"])
-        df["lon"] = pd.to_numeric(df["lon"])
-
-        df_list.append(df)
-
-    df = pd.concat(df_list)
-
-    return df
-
-df = load_years_data(parameter, selected_years)
-
-# ================= KD TREE =================
-@st.cache_resource
-def build_kdtree(dataframe):
-
-    grid_points = dataframe[["lat","lon"]].drop_duplicates().values
-    tree = cKDTree(grid_points)
-
-    return tree, grid_points
-
-tree, grid_points = build_kdtree(df)
-
-# ================= DATE RANGE =================
-min_date = df["date"].min()
-max_date = df["date"].max()
-
-start_date = st.sidebar.date_input(
-    "Start Date",
-    value=st.session_state.start_date or min_date,
-    min_value=min_date,
-    max_value=max_date
-)
-
-end_date = st.sidebar.date_input(
-    "End Date",
-    value=st.session_state.end_date or max_date,
-    min_value=min_date,
-    max_value=max_date
-)
-
-if start_date > end_date:
-    st.sidebar.error("Start Date must be before End Date")
-    st.stop()
-
-# ================= LOCATION METHOD =================
-st.sidebar.markdown("### Select Location Input Method")
-
-location_method = st.sidebar.radio(
-    "Choose one option:",
-    ["Enter Latitude / Longitude", "Select Location on Map"]
-)
-
-lat_input = ""
-lon_input = ""
-
-if location_method == "Enter Latitude / Longitude":
-
-    lat_input = st.sidebar.text_input(
-        "Enter Latitude",
-        st.session_state.lat
+    parameter = st.sidebar.selectbox(
+        "Select Parameter",
+        ["rain", "tmax", "tmin"]
     )
 
-    lon_input = st.sidebar.text_input(
-        "Enter Longitude",
-        st.session_state.lon
+    config = GRID_CONFIG[parameter]
+
+    # ================= DATA FILES =================
+    data_folder = os.path.join("data", parameter)
+    parquet_files = glob.glob(os.path.join(data_folder, "*.parquet"))
+
+    if not parquet_files:
+        st.error("No parquet files found.")
+        st.stop()
+
+    years = sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
+
+    selected_years = st.sidebar.multiselect(
+        "Select Years",
+        years,
+        default=[years[0]]
     )
 
-elif location_method == "Select Location on Map":
+    if len(selected_years) > MAX_YEAR_SELECTION:
+        st.sidebar.error(f"Select maximum {MAX_YEAR_SELECTION} years")
+        st.stop()
 
-    st.sidebar.markdown("Click on map to select location")
+    # ================= LOAD DATA =================
+    @st.cache_data
+    def load_years_data(parameter, years):
 
-    m = folium.Map(
-        location=[20.5937,78.9629],
-        zoom_start=4,
-        tiles="Esri.WorldImagery",
-        attr="Esri"
+        df_list = []
+
+        for year in years:
+
+            file = glob.glob(os.path.join("data", parameter, f"{year}*.parquet"))[0]
+
+            df = pd.read_parquet(file)
+
+            df["date"] = pd.to_datetime(df["date"])
+            df["lat"] = pd.to_numeric(df["lat"])
+            df["lon"] = pd.to_numeric(df["lon"])
+
+            df_list.append(df)
+
+        df = pd.concat(df_list)
+
+        return df
+
+    df = load_years_data(parameter, selected_years)
+
+    # ================= KD TREE =================
+    @st.cache_resource
+    def build_kdtree(dataframe):
+
+        grid_points = dataframe[["lat","lon"]].drop_duplicates().values
+        tree = cKDTree(grid_points)
+
+        return tree, grid_points
+
+    tree, grid_points = build_kdtree(df)
+
+    # ================= DATE RANGE =================
+    min_date = df["date"].min()
+    max_date = df["date"].max()
+
+    start_date = st.sidebar.date_input(
+        "Start Date",
+        value=st.session_state.start_date or min_date,
+        min_value=min_date,
+        max_value=max_date
     )
 
-    folium.TileLayer(
-        tiles="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri",
-        name="Labels",
-        overlay=True
-    ).add_to(m)
+    end_date = st.sidebar.date_input(
+        "End Date",
+        value=st.session_state.end_date or max_date,
+        min_value=min_date,
+        max_value=max_date
+    )
 
-    map_data = st_folium(m, height=500, width=900)
+    if start_date > end_date:
+        st.sidebar.error("Start Date must be before End Date")
+        st.stop()
 
-    if map_data and map_data["last_clicked"] is not None:
+    # ================= LOCATION METHOD =================
+    st.sidebar.markdown("### Select Location Input Method")
 
-        clicked_lat = map_data["last_clicked"]["lat"]
-        clicked_lon = map_data["last_clicked"]["lng"]
+    location_method = st.sidebar.radio(
+        "Choose one option:",
+        ["Enter Latitude / Longitude", "Select Location on Map"]
+    )
 
-        lat_input = str(round(clicked_lat,4))
-        lon_input = str(round(clicked_lon,4))
+    lat_input = ""
+    lon_input = ""
 
-        st.sidebar.write("Selected Location:")
-        st.sidebar.write(f"Lat: {lat_input}")
-        st.sidebar.write(f"Lon: {lon_input}")
+    if location_method == "Enter Latitude / Longitude":
 
-# ================= BUTTONS =================
-submit_button = st.sidebar.button("Submit")
-reset_button = st.sidebar.button("Reset")
+        lat_input = st.sidebar.text_input("Enter Latitude", st.session_state.lat)
+        lon_input = st.sidebar.text_input("Enter Longitude", st.session_state.lon)
 
-if reset_button:
+    elif location_method == "Select Location on Map":
 
-    st.session_state.lat = ""
-    st.session_state.lon = ""
-    st.session_state.start_date = None
-    st.session_state.end_date = None
-    st.session_state.submitted = False
+        st.sidebar.markdown("Click on map to select location")
 
-    st.rerun()
+        m = folium.Map(
+            location=[20.5937,78.9629],
+            zoom_start=4,
+            tiles="Esri.WorldImagery",
+            attr="Esri"
+        )
 
-if submit_button:
+        folium.TileLayer(
+            tiles="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri",
+            name="Labels",
+            overlay=True
+        ).add_to(m)
 
-    st.session_state.lat = lat_input
-    st.session_state.lon = lon_input
-    st.session_state.start_date = start_date
-    st.session_state.end_date = end_date
-    st.session_state.submitted = True
+        map_data = st_folium(m, height=500, width=900)
 
-# ================= MAIN LOGIC =================
-if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
+        if map_data and map_data["last_clicked"] is not None:
 
-    try:
+            clicked_lat = map_data["last_clicked"]["lat"]
+            clicked_lon = map_data["last_clicked"]["lng"]
 
-        lat_val = float(st.session_state.lat)
-        lon_val = float(st.session_state.lon)
+            lat_input = str(round(clicked_lat,4))
+            lon_input = str(round(clicked_lon,4))
 
-        if not (config["lat_min"] <= lat_val <= config["lat_max"]):
-            st.error("Latitude outside IMD bounds.")
-            st.stop()
+            st.sidebar.write("Selected Location:")
+            st.sidebar.write(f"Lat: {lat_input}")
+            st.sidebar.write(f"Lon: {lon_input}")
 
-        if not (config["lon_min"] <= lon_val <= config["lon_max"]):
-            st.error("Longitude outside IMD bounds.")
-            st.stop()
+    # ================= BUTTONS =================
+    submit_button = st.sidebar.button("Submit")
+    reset_button = st.sidebar.button("Reset")
 
-        start_date = pd.to_datetime(st.session_state.start_date)
-        end_date = pd.to_datetime(st.session_state.end_date)
+    if reset_button:
 
-        date_filtered = df[
-            (df["date"] >= start_date) &
-            (df["date"] <= end_date)
-        ]
+        st.session_state.lat = ""
+        st.session_state.lon = ""
+        st.session_state.start_date = None
+        st.session_state.end_date = None
+        st.session_state.submitted = False
 
-        epsilon = 1e-6
+        st.rerun()
 
-        exact_row = date_filtered[
-            (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
-            (np.abs(date_filtered["lon"] - lon_val) < epsilon)
-        ]
+    if submit_button:
 
-        if not exact_row.empty:
+        st.session_state.lat = lat_input
+        st.session_state.lon = lon_input
+        st.session_state.start_date = start_date
+        st.session_state.end_date = end_date
+        st.session_state.submitted = True
 
-            grid_status = "Exact Grid Point Found"
-            grid_lat = lat_val
-            grid_lon = lon_val
-            row = exact_row
+    # ================= MAIN LOGIC =================
+    if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
-        else:
+        try:
 
-            dist, idx = tree.query([lat_val, lon_val])
+            lat_val = float(st.session_state.lat)
+            lon_val = float(st.session_state.lon)
 
-            grid_lat, grid_lon = grid_points[idx]
+            if not (config["lat_min"] <= lat_val <= config["lat_max"]):
+                st.error("Latitude outside IMD bounds.")
+                st.stop()
 
-            row = date_filtered[
-                (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
-                (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
+            if not (config["lon_min"] <= lon_val <= config["lon_max"]):
+                st.error("Longitude outside IMD bounds.")
+                st.stop()
+
+            start_date = pd.to_datetime(st.session_state.start_date)
+            end_date = pd.to_datetime(st.session_state.end_date)
+
+            date_filtered = df[
+                (df["date"] >= start_date) &
+                (df["date"] <= end_date)
             ]
 
-            grid_status = "Nearest Grid Found"
+            epsilon = 1e-6
 
-        value = row.iloc[0][parameter]
+            exact_row = date_filtered[
+                (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
+                (np.abs(date_filtered["lon"] - lon_val) < epsilon)
+            ]
 
-        tabs = st.tabs(["Description","Tabular","Graphical"])
+            if not exact_row.empty:
 
-        with tabs[0]:
+                grid_status = "Exact Grid Point Found"
+                grid_lat = lat_val
+                grid_lon = lon_val
+                row = exact_row
 
-            if grid_status == "Exact Grid Point Found":
-                st.success(grid_status)
             else:
-                st.warning(grid_status)
 
-            col1, col2 = st.columns(2)
+                dist, idx = tree.query([lat_val, lon_val])
 
-            with col1:
-                st.write("Entered Latitude:", lat_val)
-                st.write("Entered Longitude:", lon_val)
-                st.write("Grid Latitude Used:", grid_lat)
-                st.write("Grid Longitude Used:", grid_lon)
+                grid_lat, grid_lon = grid_points[idx]
 
-            with col2:
-                st.write("Start Date:", start_date.date())
-                st.write("End Date:", end_date.date())
-                st.write("Resolution:", f"{config['resolution']}°")
-                st.write("Value:", value)
+                row = date_filtered[
+                    (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
+                    (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
+                ]
 
-        with tabs[1]:
+                grid_status = "Nearest Grid Found"
 
-            all_data = date_filtered[
-                (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
-                (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
-            ].sort_values("date")
+            value = row.iloc[0][parameter]
 
-            st.dataframe(all_data)
+            tabs = st.tabs(["Description","Tabular","Graphical"])
 
-        with tabs[2]:
+            with tabs[0]:
 
-            fig, ax = plt.subplots(figsize=(10,4))
+                if grid_status == "Exact Grid Point Found":
+                    st.success(grid_status)
+                else:
+                    st.warning(grid_status)
 
-            ax.plot(all_data["date"], all_data[parameter], marker='x')
+                col1, col2 = st.columns(2)
 
-            ax.set_xlabel("Date")
-            ax.set_ylabel(parameter.capitalize())
+                with col1:
+                    st.write("Entered Latitude:", lat_val)
+                    st.write("Entered Longitude:", lon_val)
+                    st.write("Grid Latitude Used:", grid_lat)
+                    st.write("Grid Longitude Used:", grid_lon)
 
-            ax.set_title(
-                f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
-            )
+                with col2:
+                    st.write("Start Date:", start_date.date())
+                    st.write("End Date:", end_date.date())
+                    st.write("Resolution:", f"{config['resolution']}°")
+                    st.write("Value:", value)
 
-            ax.grid(True)
+            with tabs[1]:
 
-            st.pyplot(fig)
+                all_data = date_filtered[
+                    (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
+                    (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
+                ].sort_values("date")
 
-    except ValueError:
-        st.error("Latitude and Longitude must be numeric.")
+                st.dataframe(all_data)
 
-else:
-    st.info("Enter location and click Submit to fetch data.")
+            with tabs[2]:
+
+                fig, ax = plt.subplots(figsize=(10,4))
+
+                ax.plot(all_data["date"], all_data[parameter], marker='x')
+
+                ax.set_xlabel("Date")
+                ax.set_ylabel(parameter.capitalize())
+
+                ax.set_title(
+                    f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
+                )
+
+                ax.grid(True)
+
+                st.pyplot(fig)
+
+        except ValueError:
+            st.error("Latitude and Longitude must be numeric.")
+
+    else:
+        st.info("Enter location and click Submit to fetch data.")
