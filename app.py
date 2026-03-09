@@ -154,7 +154,7 @@ location_method = st.sidebar.radio(
 lat_input = ""
 lon_input = ""
 
-# ===== OPTION 1 : MANUAL INPUT =====
+# ===== MANUAL ENTRY =====
 if location_method == "Enter Latitude / Longitude":
 
     lat_input = st.sidebar.text_input(
@@ -167,14 +167,27 @@ if location_method == "Enter Latitude / Longitude":
         st.session_state.lon
     )
 
-# ===== OPTION 2 : MAP INPUT =====
+# ===== MAP ENTRY =====
 elif location_method == "Select Location on Map":
 
     st.sidebar.markdown("Click on map to select location")
 
-    m = folium.Map(location=[20.5937,78.9629], zoom_start=4, tiles="Esri.WorldImagery", attr="Esri")
+    m = folium.Map(
+        location=[20.5937,78.9629],
+        zoom_start=4,
+        tiles="Esri.WorldImagery",
+        attr="Esri"
+    )
 
-    map_data = st_folium(m, height=500, width=900)
+    # ADD LABELS + BOUNDARIES
+    folium.TileLayer(
+        tiles="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri",
+        name="Labels",
+        overlay=True
+    ).add_to(m)
+
+    map_data = st_folium(m, height=350, width=300)
 
     if map_data and map_data["last_clicked"] is not None:
 
@@ -184,7 +197,7 @@ elif location_method == "Select Location on Map":
         lat_input = str(round(clicked_lat,4))
         lon_input = str(round(clicked_lon,4))
 
-        st.sidebar.write(f"Selected Location:")
+        st.sidebar.write("Selected Location:")
         st.sidebar.write(f"Lat: {lat_input}")
         st.sidebar.write(f"Lon: {lon_input}")
 
@@ -226,18 +239,8 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
             st.error("Longitude outside IMD bounds.")
             st.stop()
 
-        # SAFE DATE HANDLING
-        start_date = st.session_state.start_date
-        end_date = st.session_state.end_date
-
-        if start_date is None:
-            start_date = df["date"].min()
-
-        if end_date is None:
-            end_date = df["date"].max()
-
-        start_date = pd.to_datetime(start_date)
-        end_date = pd.to_datetime(end_date)
+        start_date = pd.to_datetime(st.session_state.start_date)
+        end_date = pd.to_datetime(st.session_state.end_date)
 
         date_filtered = df[
             (df["date"] >= start_date) &
@@ -246,7 +249,6 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         epsilon = 1e-6
 
-        # EXACT GRID CHECK
         exact_row = date_filtered[
             (np.abs(date_filtered["lat"] - lat_val) < epsilon) &
             (np.abs(date_filtered["lon"] - lon_val) < epsilon)
@@ -270,15 +272,10 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
                 (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
             ]
 
-            if row.empty:
-                st.error("Nearest grid not found.")
-                st.stop()
-
             grid_status = "Nearest Grid Found"
 
         value = row.iloc[0][parameter]
 
-        # ================= TABS =================
         tabs = st.tabs(["Description","Tabular","Graphical"])
 
         with tabs[0]:
@@ -304,40 +301,29 @@ if st.session_state.submitted and st.session_state.lat and st.session_state.lon:
 
         with tabs[1]:
 
-            st.subheader("Tabular Data")
-
             all_data = date_filtered[
                 (np.abs(date_filtered["lat"] - grid_lat) < epsilon) &
                 (np.abs(date_filtered["lon"] - grid_lon) < epsilon)
             ].sort_values("date")
 
-            if all_data.empty:
-                st.warning("No historical data.")
-            else:
-                st.dataframe(all_data)
+            st.dataframe(all_data)
 
         with tabs[2]:
 
-            st.subheader("Graphical Data")
+            fig, ax = plt.subplots(figsize=(10,4))
 
-            if all_data.empty:
-                st.warning("No historical data.")
-            else:
+            ax.plot(all_data["date"], all_data[parameter], marker='x')
 
-                fig, ax = plt.subplots(figsize=(10,4))
+            ax.set_xlabel("Date")
+            ax.set_ylabel(parameter.capitalize())
 
-                ax.plot(all_data["date"], all_data[parameter], marker='x')
+            ax.set_title(
+                f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
+            )
 
-                ax.set_xlabel("Date")
-                ax.set_ylabel(parameter.capitalize())
+            ax.grid(True)
 
-                ax.set_title(
-                    f"{parameter.capitalize()} Time Series\nEntered: ({lat_val},{lon_val}) | Grid Used: ({grid_lat},{grid_lon})"
-                )
-
-                ax.grid(True)
-
-                st.pyplot(fig)
+            st.pyplot(fig)
 
     except ValueError:
         st.error("Latitude and Longitude must be numeric.")
