@@ -31,29 +31,28 @@ background:#e8f5e9;
 </style>
 """, unsafe_allow_html=True)
 
-# ================= GRID OVERLAY FUNCTION =================
-def add_imd_grid_overlay(map_obj, config):
+# ================= GRID MAP FUNCTION =================
+def draw_grid_cells(map_obj, center_lat, center_lon, resolution, n_cells=3):
 
-    lat_vals = np.arange(config["lat_min"], config["lat_max"] + config["resolution"], config["resolution"])
-    lon_vals = np.arange(config["lon_min"], config["lon_max"] + config["resolution"], config["resolution"])
+    for i in range(-n_cells, n_cells+1):
+        for j in range(-n_cells, n_cells+1):
 
-    # Latitude grid lines
-    for lat in lat_vals:
-        folium.PolyLine(
-            locations=[(lat, config["lon_min"]), (lat, config["lon_max"])],
-            color="cyan",
-            weight=0.4,
-            opacity=0.6
-        ).add_to(map_obj)
+            lat = center_lat + i*resolution
+            lon = center_lon + j*resolution
 
-    # Longitude grid lines
-    for lon in lon_vals:
-        folium.PolyLine(
-            locations=[(config["lat_min"], lon), (config["lat_max"], lon)],
-            color="cyan",
-            weight=0.4,
-            opacity=0.6
-        ).add_to(map_obj)
+            bounds = [
+                [lat-resolution/2, lon-resolution/2],
+                [lat+resolution/2, lon+resolution/2]
+            ]
+
+            folium.Rectangle(
+                bounds=bounds,
+                color="yellow",
+                weight=1,
+                fill=True,
+                fill_opacity=0.1,
+                popup=f"Grid Lat: {round(lat,4)} | Grid Lon: {round(lon,4)}"
+            ).add_to(map_obj)
 
 # ================= PAGE STATE =================
 if "page" not in st.session_state:
@@ -165,10 +164,6 @@ elif st.session_state.page=="dashboard":
         default=[years[0]]
         )
 
-        if len(selected_years)>MAX_YEAR_SELECTION:
-            st.sidebar.error(f"Select maximum {MAX_YEAR_SELECTION} years")
-            st.stop()
-
         @st.cache_data
         def load_years_data(parameter,years):
 
@@ -192,25 +187,6 @@ elif st.session_state.page=="dashboard":
 
         df=load_years_data(parameter,selected_years)
 
-        min_date=df["date"].min()
-        max_date=df["date"].max()
-
-        start_date=st.sidebar.date_input(
-        "Start Date",
-        value=min_date,
-        min_value=min_date,
-        max_value=max_date
-        )
-
-        end_date=st.sidebar.date_input(
-        "End Date",
-        value=max_date,
-        min_value=min_date,
-        max_value=max_date
-        )
-
-        df=df[(df["date"]>=pd.to_datetime(start_date))&(df["date"]<=pd.to_datetime(end_date))]
-
     # ================= LOCATION =================
     st.sidebar.markdown("### Select Location Input Method")
 
@@ -229,16 +205,7 @@ elif st.session_state.page=="dashboard":
 
     else:
 
-        m=folium.Map(
-        location=[20.5937,78.9629],
-        zoom_start=4,
-        tiles="Esri.WorldImagery",
-        attr="Esri"
-        )
-
-        # GRID OVERLAY ONLY IN VIEW MODE
-        if st.session_state.mode=="view":
-            add_imd_grid_overlay(m,config)
+        m=folium.Map(location=[20.5937,78.9629],zoom_start=4,tiles="Esri.WorldImagery")
 
         map_data=st_folium(m,height=500,width=900)
 
@@ -289,6 +256,20 @@ elif st.session_state.page=="dashboard":
                 st.write("Date:",selected_date)
                 st.write("Resolution:",f"{config['resolution']}°")
                 st.write("Value:",value)
+
+            # ================= GRID VISUALIZATION MAP =================
+
+            st.subheader("Grid Cell Visualization")
+
+            grid_map = folium.Map(
+                location=[grid_lat,grid_lon],
+                zoom_start=7,
+                tiles="CartoDB Positron"
+            )
+
+            draw_grid_cells(grid_map,grid_lat,grid_lon,config["resolution"],n_cells=3)
+
+            st_folium(grid_map,height=500,width=900)
 
         # ================= DOWNLOAD MODE =================
         else:
