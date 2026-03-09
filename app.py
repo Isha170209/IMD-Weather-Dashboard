@@ -366,6 +366,46 @@ elif st.session_state.page=="dashboard":
                 tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                 attr="Esri Satellite"
             )
+            # ================= LEGEND =================
+
+            if parameter == "rain":
+
+                legend_html = """
+                <div style="
+                position: fixed; 
+                bottom: 50px; left: 50px; width: 160px; height: 210px; 
+                background-color: white;
+                border:2px solid grey; z-index:9999; font-size:14px;
+                padding:10px;">
+                <b>Rainfall (mm)</b><br>
+                <i style="background:#08306B;width:18px;height:18px;float:left;margin-right:8px"></i>>200<br>
+                <i style="background:#2171B5;width:18px;height:18px;float:left;margin-right:8px"></i>100-200<br>
+                <i style="background:#6BAED6;width:18px;height:18px;float:left;margin-right:8px"></i>50-100<br>
+                <i style="background:#C6DBEF;width:18px;height:18px;float:left;margin-right:8px"></i>10-50<br>
+                <i style="background:#F7FBFF;width:18px;height:18px;float:left;margin-right:8px"></i><10
+                </div>
+                """
+
+            else:
+
+                legend_html = """
+                <div style="
+                position: fixed; 
+                bottom: 50px; left: 50px; width: 160px; height: 230px; 
+                background-color: white;
+                border:2px solid grey; z-index:9999; font-size:14px;
+                padding:10px;">
+                <b>Temperature (°C)</b><br>
+                <i style="background:#800026;width:18px;height:18px;float:left;margin-right:8px"></i>>=40<br>
+                <i style="background:#BD0026;width:18px;height:18px;float:left;margin-right:8px"></i>35-40<br>
+                <i style="background:#FC4E2A;width:18px;height:18px;float:left;margin-right:8px"></i>30-35<br>
+                <i style="background:#FD8D3C;width:18px;height:18px;float:left;margin-right:8px"></i>25-30<br>
+                <i style="background:#FEB24C;width:18px;height:18px;float:left;margin-right:8px"></i>20-25<br>
+                <i style="background:#31A354;width:18px;height:18px;float:left;margin-right:8px"></i><20
+                </div>
+                """
+
+            grid_map.get_root().html.add_child(folium.Element(legend_html))
 
             draw_grid_cells(
                 grid_map,
