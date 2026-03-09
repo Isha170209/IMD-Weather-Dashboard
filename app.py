@@ -48,6 +48,56 @@ def temp_color(val):
     else:
         return "#31A354"
 
+# ================= LEGEND =================
+def add_legend(map_obj, parameter):
+
+    if parameter == "rain":
+
+        legend_html = """
+        <div style="
+        position: fixed;
+        bottom: 50px; right: 50px; width: 150px; height: 170px;
+        background-color: white;
+        border:2px solid grey;
+        z-index:9999;
+        font-size:12px;
+        padding:10px;
+        ">
+        <b>Rainfall (mm)</b><br>
+
+        <i style="background:#08306B;width:15px;height:15px;float:left;margin-right:5px;"></i> ≥200<br>
+        <i style="background:#2171B5;width:15px;height:15px;float:left;margin-right:5px;"></i> 100–200<br>
+        <i style="background:#6BAED6;width:15px;height:15px;float:left;margin-right:5px;"></i> 50–100<br>
+        <i style="background:#C6DBEF;width:15px;height:15px;float:left;margin-right:5px;"></i> 10–50<br>
+        <i style="background:#F7FBFF;width:15px;height:15px;float:left;margin-right:5px;"></i> <10
+        </div>
+        """
+
+    else:
+
+        legend_html = """
+        <div style="
+        position: fixed;
+        bottom: 50px; right: 50px; width: 150px; height: 190px;
+        background-color: white;
+        border:2px solid grey;
+        z-index:9999;
+        font-size:12px;
+        padding:10px;
+        ">
+        <b>Temperature (°C)</b><br>
+
+        <i style="background:#800026;width:15px;height:15px;float:left;margin-right:5px;"></i> ≥40<br>
+        <i style="background:#BD0026;width:15px;height:15px;float:left;margin-right:5px;"></i> 35–40<br>
+        <i style="background:#FC4E2A;width:15px;height:15px;float:left;margin-right:5px;"></i> 30–35<br>
+        <i style="background:#FD8D3C;width:15px;height:15px;float:left;margin-right:5px;"></i> 25–30<br>
+        <i style="background:#FEB24C;width:15px;height:15px;float:left;margin-right:5px;"></i> 20–25<br>
+        <i style="background:#31A354;width:15px;height:15px;float:left;margin-right:5px;"></i> <20
+        </div>
+        """
+
+    map_obj.get_root().html.add_child(folium.Element(legend_html))
+
 # ================= FAST GRID DRAW =================
 def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
 
@@ -114,9 +164,7 @@ if "submitted" not in st.session_state:
 if "view_submit" not in st.session_state:
     st.session_state.view_submit = False
 
-# ======================================================
-# ======================= HOME PAGE ====================
-# ======================================================
+# ================= HOME PAGE =================
 if st.session_state.page == "home":
 
     col1, col2 = st.columns([8,2])
@@ -146,9 +194,7 @@ if st.session_state.page == "home":
             st.session_state.page="dashboard"
             st.rerun()
 
-# ======================================================
-# ===================== DASHBOARD ======================
-# ======================================================
+# ================= DASHBOARD =================
 elif st.session_state.page == "dashboard":
 
     col1, col2 = st.columns([8,2])
@@ -177,12 +223,9 @@ elif st.session_state.page == "dashboard":
 
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
-
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
 
-# ======================================================
-# ====================== VIEW MODE =====================
-# ======================================================
+# ================= VIEW MODE =================
     if st.session_state.mode=="view":
 
         selected_year=st.sidebar.selectbox("Select Year",years)
@@ -190,7 +233,6 @@ elif st.session_state.page == "dashboard":
         file=glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
 
         df=pd.read_parquet(file)
-
         df["date"]=pd.to_datetime(df["date"])
 
         min_date=df["date"].min()
@@ -245,14 +287,14 @@ elif st.session_state.page == "dashboard":
 
             draw_india_grid(map_obj,df,parameter,selected_date,resolution)
 
+            add_legend(map_obj,parameter)
+
             st_folium(map_obj,height=650,width=1100)
 
         else:
             st.info("Select filters and click Submit to view map.")
 
-# ======================================================
-# ==================== DOWNLOAD MODE ===================
-# ======================================================
+# ================= DOWNLOAD MODE =================
     elif st.session_state.mode=="download":
 
         selected_years=st.sidebar.multiselect("Select Years",years,default=[years[0]])
