@@ -9,7 +9,17 @@ import folium
 from streamlit_folium import st_folium
 
 st.set_page_config(layout="wide")
-st.title("Weather Data Dashboard")
+
+# ================= HEADER WITH LOGO =================
+col1, col2 = st.columns([8,2])
+
+with col1:
+    st.title("Weather Data Dashboard")
+
+with col2:
+    logo_path = os.path.join("data", "hdfc ergo logo.png")
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=120)
 
 # ================= GRID CONFIG =================
 GRID_CONFIG = {
@@ -143,7 +153,7 @@ if start_date > end_date:
     st.sidebar.error("Start Date must be before End Date")
     st.stop()
 
-# ================= LOCATION INPUT METHOD =================
+# ================= LOCATION METHOD =================
 st.sidebar.markdown("### Select Location Input Method")
 
 location_method = st.sidebar.radio(
@@ -154,7 +164,6 @@ location_method = st.sidebar.radio(
 lat_input = ""
 lon_input = ""
 
-# ===== MANUAL ENTRY =====
 if location_method == "Enter Latitude / Longitude":
 
     lat_input = st.sidebar.text_input(
@@ -167,7 +176,6 @@ if location_method == "Enter Latitude / Longitude":
         st.session_state.lon
     )
 
-# ===== MAP ENTRY =====
 elif location_method == "Select Location on Map":
 
     st.sidebar.markdown("Click on map to select location")
@@ -179,7 +187,6 @@ elif location_method == "Select Location on Map":
         attr="Esri"
     )
 
-    # ADD LABELS + BOUNDARIES
     folium.TileLayer(
         tiles="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
         attr="Esri",
