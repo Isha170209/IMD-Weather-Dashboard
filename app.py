@@ -324,6 +324,3 @@ elif st.session_state.page=="dashboard":
         ax.grid(True)
 
         st.pyplot(fig)
-
-    else:
-        st.info("Enter location and click Submit to fetch data.")
