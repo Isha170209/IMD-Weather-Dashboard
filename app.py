@@ -318,7 +318,48 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         popup=folium.GeoJsonPopup(fields=["Grid"])
     ).add_to(map_obj)
 
+# ================= ADMIN DASHBOARD =================
+if st.session_state.page=="admin":
+
+    apply_background()
+
+    col1,col2=st.columns([8,1])
+
+    with col1:
+        st.title("Admin Dashboard")
+
+    with col2:
+        logo_path=os.path.join("data","logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path,width=100)
+
+    st.write("### Registered Users")
+
+    df = load_users()
+
+    if df.empty:
+        st.info("No users registered yet.")
+    else:
+        st.dataframe(df[["email"]])
+
+    st.write("Total Registered Users:", len(df))
+
+    st.write("")
+
+    colA,colB = st.columns(2)
+
+    with colA:
+        if st.button("⬅ Go to Home"):
+            st.session_state.page="home"
+            st.rerun()
+
+    with colB:
+        if st.button("Logout"):
+            st.session_state.logged_in=False
+            st.session_state.page="login"
+            st.rerun()
 # ================= HOME =================
+
 if st.session_state.page=="home":
 
     apply_background()
