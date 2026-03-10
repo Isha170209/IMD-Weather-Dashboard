@@ -116,7 +116,6 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
     ).add_to(map_obj)
 
 
-
 # ================= HOME =================
 if st.session_state.page=="home":
 
@@ -137,7 +136,6 @@ if st.session_state.page=="home":
             background-image: url("data:image/jpg;base64,{bg_base64}");
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
         }}
 
         [data-testid="stAppViewContainer"]::before {{
@@ -164,8 +162,11 @@ if st.session_state.page=="home":
 
         div.stButton > button:hover {{
             background-color:#f2f2f2;
-            border:{border_width}px solid black;
-            color:black;
+        }}
+
+        /* Force square homepage logo */
+        [data-testid="stImage"] img {{
+            border-radius:0px !important;
         }}
 
         </style>
@@ -182,9 +183,10 @@ if st.session_state.page=="home":
             st.image(logo_path,width=100)
 
     st.write("")
+    st.write("")
 
-    # ===== First row =====
-    colA,colB=st.columns([1,1])
+    # ===== centered first row =====
+    space1, colA, colB, space2 = st.columns([2,3,3,2])
 
     with colA:
         if st.button("Download IMD Gridded Weather Data\n(Single Location)"):
@@ -202,38 +204,37 @@ if st.session_state.page=="home":
 
     st.write("")
 
-    # ===== Second row centered =====
-    colX,colY,colZ=st.columns([1,1,1])
+    # ===== centered second row =====
+    space3, colC, space4 = st.columns([3,3,3])
 
-    with colY:
+    with colC:
         if st.button("View IMD Gridded Weather Data"):
             st.session_state.mode="view"
             st.session_state.page="dashboard"
             st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
             st.rerun()
 
-    # ================= DASHBOARD =================
+
+# ================= DASHBOARD =================
 elif st.session_state.page=="dashboard":
 
-    # Reset background to white
     st.markdown("""
     <style>
-    /* White background for dashboard */
     [data-testid="stAppViewContainer"]{
     background:white;
     }
-   /* Force square logo on dashboard pages */
-   [data-testid="stImage"] img{
-       border-radius:0px !important;
+
+    [data-testid="stImage"] img{
+        border-radius:0px !important;
     }
-</style>
-""",unsafe_allow_html=True)
+    </style>
+    """,unsafe_allow_html=True)
 
     col1,col2=st.columns([8,2])
 
     with col1:
         st.title(st.session_state.dashboard_title)
-        
+
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
@@ -254,7 +255,6 @@ elif st.session_state.page=="dashboard":
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
 
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
-
 
 # ================= VIEW =================
     if st.session_state.mode=="view":
