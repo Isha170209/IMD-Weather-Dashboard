@@ -312,7 +312,7 @@ elif st.session_state.page=="dashboard":
             folium.Marker(
                 location=[lat_val,lon_val],
                 popup="Searched Location",
-                icon=folium.Icon(color="red",icon="info-sign")
+                icon=folium.Icon(color="yellow",icon="info-sign")
             ).add_to(map_obj)
 
             add_legend(map_obj,parameter)
