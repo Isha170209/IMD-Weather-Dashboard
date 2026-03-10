@@ -205,7 +205,7 @@ if st.session_state.page=="home":
     st.write("")
 
     # ===== centered second row =====
-    space3, colC, space4 = st.columns([3,3,3])
+    space3, colC, space4 = st.columns([4,3,3])
 
     with colC:
         if st.button("View IMD Gridded Weather Data"):
