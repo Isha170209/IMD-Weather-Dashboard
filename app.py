@@ -175,7 +175,7 @@ if st.session_state.page=="home":
     col1,col2=st.columns([8,1])
 
     with col1:
-        st.title("Weather Dashboard")
+        st.title("Weather Data Portal")
 
     with col2:
         logo_path=os.path.join("data","logo.png")
