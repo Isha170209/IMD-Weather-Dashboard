@@ -106,7 +106,7 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
     ).add_to(map_obj)
 
 # ================= SESSION STATE =================
-for key, default in [("page","home"), ("mode","view"), ("submitted",False), ("view_submit",False)]:
+for key, default in [("page","home"), ("mode","view"), ("submitted",False), ("view_submit",False), ("dashboard_title","")]:
     if key not in st.session_state: st.session_state[key]=default
 
 # ================= HOME =================
@@ -120,18 +120,27 @@ if st.session_state.page=="home":
     colA,colB,colC=st.columns(3)
     with colA:
         if st.button("View IMD Gridded Weather Data"):
-            st.session_state.mode="view"; st.session_state.page="dashboard"; st.rerun()
+            st.session_state.mode="view"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
+            st.rerun()
     with colB:
         if st.button("Download IMD Gridded Weather Data (Single Location)"):
-            st.session_state.mode="download"; st.session_state.page="dashboard"; st.rerun()
+            st.session_state.mode="download"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Single Location Data Download"
+            st.rerun()
     with colC:
         if st.button("Download IMD Gridded Weather Data (Multiple Locations)"):
-            st.session_state.mode="download_multi"; st.session_state.page="dashboard"; st.rerun()
+            st.session_state.mode="download_multi"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Multiple Locations Data Download"
+            st.rerun()
 
 # ================= DASHBOARD =================
 elif st.session_state.page=="dashboard":
     col1,col2=st.columns([8,2])
-    with col1: st.title("IMD Gridded Data")
+    with col1: st.title(st.session_state.dashboard_title)  # Dynamic title
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path): st.image(logo_path,width=100)
