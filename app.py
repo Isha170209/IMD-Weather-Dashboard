@@ -24,7 +24,7 @@ if os.path.exists(bg_path):
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        opacity: 1;
+        opacity: 0.5;
     }}
     [data-testid="stAppViewContainer"]::before {{
         content: "";
