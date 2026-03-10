@@ -121,7 +121,7 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
 if st.session_state.page=="home":
 
     bg_opacity = 0.5
-    border_width = 3
+    border_width = 2
 
     bg_path=os.path.join("data","bg.jpg")
 
