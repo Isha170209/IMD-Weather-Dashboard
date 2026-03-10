@@ -35,6 +35,11 @@ def authenticate(email,password):
     hashed=hash_password(password)
     return ((df["email"]==email)&(df["password"]==hashed)).any()
 
+def update_password(email,new_password):
+    df=load_users()
+    df.loc[df["email"]==email,"password"]=hash_password(new_password)
+    df.to_csv(USER_DB,index=False)
+
 # ================= SESSION STATE =================
 for key, default in [
     ("page","login"),
@@ -42,154 +47,15 @@ for key, default in [
     ("submitted",False),
     ("view_submit",False),
     ("dashboard_title",""),
-    ("logged_in",False)
+    ("logged_in",False),
+    ("user_email","")
 ]:
     if key not in st.session_state:
         st.session_state[key]=default
 
 
-# ================= LOGIN PAGE =================
-if st.session_state.page=="login":
-
-    st.title("Weather Data Portal Login")
-
-    tab1,tab2=st.tabs(["Login","Register"])
-
-    with tab1:
-
-        email=st.text_input("Email")
-        password=st.text_input("Password",type="password")
-
-        if st.button("Login"):
-
-            if authenticate(email,password):
-
-                st.session_state.logged_in=True
-                st.session_state.page="home"
-                st.success("Login successful")
-                st.rerun()
-
-            else:
-                st.error("Invalid email or password")
-
-    with tab2:
-
-        new_email=st.text_input("Register Email")
-        new_pass=st.text_input("Create Password",type="password")
-
-        if st.button("Register"):
-
-            df=load_users()
-
-            if new_email in df["email"].values:
-                st.warning("User already exists")
-
-            else:
-                save_user(new_email,new_pass)
-                st.success("Registration successful. Please login.")
-
-# ================= COLOR FUNCTIONS =================
-def rain_color(val):
-    if pd.isna(val): return "#ffffff"
-    if val >= 200: return "#08306B"
-    elif val >= 100: return "#2171B5"
-    elif val >= 50: return "#6BAED6"
-    elif val >= 10: return "#C6DBEF"
-    else: return "#F7FBFF"
-
-def temp_color(val):
-    if pd.isna(val): return "#ffffff"
-    if val >= 40: return "#800026"
-    elif val >= 35: return "#BD0026"
-    elif val >= 30: return "#FC4E2A"
-    elif val >= 25: return "#FD8D3C"
-    elif val >= 20: return "#FEB24C"
-    else: return "#31A354"
-
-
-# ================= LEGEND =================
-def add_legend(map_obj, parameter):
-
-    if parameter=="rain":
-        legend_html="""
-        <div style="position: fixed; bottom:30px; right:50px;
-        width:150px; background:white; border:2px solid grey;
-        z-index:9999; font-size:12px; padding:10px;">
-        <b>Rainfall (mm)</b><br>
-        <i style="background:#08306B;width:15px;height:15px;float:left;margin-right:5px;"></i> ≥200<br>
-        <i style="background:#2171B5;width:15px;height:15px;float:left;margin-right:5px;"></i> 100–200<br>
-        <i style="background:#6BAED6;width:15px;height:15px;float:left;margin-right:5px;"></i> 50–100<br>
-        <i style="background:#C6DBEF;width:15px;height:15px;float:left;margin-right:5px;"></i> 10–50<br>
-        <i style="background:#F7FBFF;width:15px;height:15px;float:left;margin-right:5px;"></i> <10
-        </div>
-        """
-    else:
-        legend_html="""
-        <div style="position: fixed; bottom:30px; right:50px;
-        width:150px; background:white; border:2px solid grey;
-        z-index:9999; font-size:12px; padding:10px;">
-        <b>Temperature (°C)</b><br>
-        <i style="background:#800026;width:15px;height:15px;float:left;margin-right:5px;"></i> ≥40<br>
-        <i style="background:#BD0026;width:15px;height:15px;float:left;margin-right:5px;"></i> 35–40<br>
-        <i style="background:#FC4E2A;width:15px;height:15px;float:left;margin-right:5px;"></i> 30–35<br>
-        <i style="background:#FD8D3C;width:15px;height:15px;float:left;margin-right:5px;"></i> 25–30<br>
-        <i style="background:#FEB24C;width:15px;height:15px;float:left;margin-right:5px;"></i> 20–25<br>
-        <i style="background:#31A354;width:15px;height:15px;float:left;margin-right:5px;"></i> <20
-        </div>
-        """
-    map_obj.get_root().html.add_child(folium.Element(legend_html))
-
-# ================= GRID DRAW =================
-def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
-
-    df_day=df[df["date"]==pd.to_datetime(selected_date)]
-    features=[]
-
-    for _,row in df_day.iterrows():
-
-        lat=row["lat"]
-        lon=row["lon"]
-        value=row[parameter]
-
-        color=rain_color(value) if parameter=="rain" else temp_color(value)
-
-        polygon=[
-            [lon-resolution/2,lat-resolution/2],
-            [lon+resolution/2,lat-resolution/2],
-            [lon+resolution/2,lat+resolution/2],
-            [lon-resolution/2,lat+resolution/2],
-            [lon-resolution/2,lat-resolution/2]
-        ]
-
-        feature={
-            "type":"Feature",
-            "properties":{
-                "Grid":f"Lat:{lat}<br>Lon:{lon}<br>{parameter}:{value}",
-                "style":{
-                    "fillColor":color,
-                    "color":"black",
-                    "weight":0.3,
-                    "fillOpacity":0.7
-                }
-            },
-            "geometry":{"type":"Polygon","coordinates":[polygon]}
-        }
-
-        features.append(feature)
-
-    geojson={"type":"FeatureCollection","features":features}
-
-    folium.GeoJson(
-        geojson,
-        style_function=lambda x:x["properties"]["style"],
-        popup=folium.GeoJsonPopup(fields=["Grid"])
-    ).add_to(map_obj)
-
-# ================= HOME =================
-if st.session_state.page=="home":
-
-    bg_opacity = 0.5
-    border_width = 2
+# ================= BACKGROUND FUNCTION =================
+def apply_background():
 
     bg_path=os.path.join("data","bg.jpg")
 
@@ -214,14 +80,14 @@ if st.session_state.page=="home":
             left:0;
             width:100%;
             height:100%;
-            background:rgba(255,255,255,{1-bg_opacity});
+            background:rgba(255,255,255,0.5);
             pointer-events:none;
         }}
 
         div.stButton > button {{
             background-color:white;
             color:black;
-            border:{border_width}px solid black;
+            border:2px solid black;
             border-radius:8px;
             height:80px;
             width:100%;
@@ -229,17 +95,107 @@ if st.session_state.page=="home":
             font-weight:600;
         }}
 
-        div.stButton > button:hover {{
-            background-color:#f2f2f2;
-        }}
-
-        /* Force square homepage logo */
-        [data-testid="stImage"] img {{
-            border-radius:0px !important;
-        }}
-
         </style>
         """,unsafe_allow_html=True)
+
+
+# ================= LOGIN PAGE =================
+if st.session_state.page=="login":
+
+    apply_background()
+
+    col1,col2=st.columns([8,1])
+
+    with col1:
+        st.title("Weather Data Portal Login")
+
+    with col2:
+        logo_path=os.path.join("data","logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path,width=100)
+
+    tab1,tab2=st.tabs(["Login","Register"])
+
+    with tab1:
+
+        email=st.text_input("Email")
+        password=st.text_input("Password",type="password")
+
+        if st.button("Login"):
+
+            if authenticate(email,password):
+
+                st.session_state.logged_in=True
+                st.session_state.user_email=email
+                st.session_state.page="home"
+                st.success("Login successful")
+                st.rerun()
+
+            else:
+                st.error("Invalid email or password")
+
+    with tab2:
+
+        new_email=st.text_input("Register Email")
+        new_pass=st.text_input("Create Password",type="password")
+
+        if st.button("Register"):
+
+            df=load_users()
+
+            if new_email in df["email"].values:
+                st.warning("User already exists")
+
+            else:
+                save_user(new_email,new_pass)
+                st.success("Registration successful. Please login.")
+
+
+# ================= PROFILE PAGE =================
+if st.session_state.page=="profile":
+
+    apply_background()
+
+    col1,col2=st.columns([8,1])
+
+    with col1:
+        st.title("My Profile")
+
+    with col2:
+        logo_path=os.path.join("data","logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path,width=100)
+
+    st.write("### Login ID")
+    st.info(st.session_state.user_email)
+
+    st.write("### Change Password")
+
+    old_pass=st.text_input("Old Password",type="password")
+    new_pass=st.text_input("New Password",type="password")
+    confirm_pass=st.text_input("Confirm New Password",type="password")
+
+    if st.button("Update Password"):
+
+        if not authenticate(st.session_state.user_email,old_pass):
+            st.error("Old password incorrect")
+
+        elif new_pass!=confirm_pass:
+            st.error("New passwords do not match")
+
+        else:
+            update_password(st.session_state.user_email,new_pass)
+            st.success("Password updated successfully")
+
+    if st.button("⬅ Back to Home"):
+        st.session_state.page="home"
+        st.rerun()
+
+
+# ================= HOME =================
+if st.session_state.page=="home":
+
+    apply_background()
 
     col1,col2=st.columns([8,1])
 
@@ -250,6 +206,22 @@ if st.session_state.page=="home":
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
+
+    st.write("")
+
+    # ===== PROFILE BUTTON =====
+    profile_col1,profile_col2,profile_col3=st.columns([7,1,1])
+
+    with profile_col2:
+        if st.button("My Profile"):
+            st.session_state.page="profile"
+            st.rerun()
+
+    with profile_col3:
+        if st.button("Logout"):
+            st.session_state.logged_in=False
+            st.session_state.page="login"
+            st.rerun()
 
     st.write("")
     st.write("")
@@ -273,7 +245,6 @@ if st.session_state.page=="home":
 
     st.write("")
 
-    # ===== centered second row =====
     space3, colC, space4 = st.columns([4,3,3])
 
     with colC:
@@ -283,16 +254,33 @@ if st.session_state.page=="home":
             st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
             st.rerun()
 
+
+# ================= COLOR FUNCTIONS =================
+def rain_color(val):
+    if pd.isna(val): return "#ffffff"
+    if val >= 200: return "#08306B"
+    elif val >= 100: return "#2171B5"
+    elif val >= 50: return "#6BAED6"
+    elif val >= 10: return "#C6DBEF"
+    else: return "#F7FBFF"
+
+def temp_color(val):
+    if pd.isna(val): return "#ffffff"
+    if val >= 40: return "#800026"
+    elif val >= 35: return "#BD0026"
+    elif val >= 30: return "#FC4E2A"
+    elif val >= 25: return "#FD8D3C"
+    elif val >= 20: return "#FEB24C"
+    else: return "#31A354"
+
+
 # ================= DASHBOARD =================
 if st.session_state.page=="dashboard":
+
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"]{
     background:white;
-    }
-
-    [data-testid="stImage"] img{
-        border-radius:0px !important;
     }
     </style>
     """,unsafe_allow_html=True)
@@ -321,7 +309,7 @@ if st.session_state.page=="dashboard":
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
     
-# ================= VIEW =================
+    # ================= VIEW =================
     if st.session_state.mode=="view":
 
         selected_year=st.sidebar.selectbox("Select Year",years)
