@@ -11,6 +11,7 @@ import base64
 import hashlib
 
 st.set_page_config(layout="wide")
+
 # ===== FORCE SQUARE CORNER LOGO =====
 st.markdown("""
 <style>
@@ -19,6 +20,10 @@ img {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ================= ADMIN CONFIG =================
+ADMIN_EMAIL = "ishku1022@gmail.com"
+ADMIN_PASSWORD = "abc@1234"
 
 # ================= USER DATABASE =================
 USER_DB=os.path.join("data","users.csv")
