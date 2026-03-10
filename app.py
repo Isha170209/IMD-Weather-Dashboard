@@ -115,10 +115,103 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         popup=folium.GeoJsonPopup(fields=["Grid"])
     ).add_to(map_obj)
 
-
 # ================= HOME =================
-# (UNCHANGED — your existing homepage code remains exactly the same)
+if st.session_state.page=="home":
 
+    bg_opacity = 0.5
+    border_width = 2
+
+    bg_path=os.path.join("data","bg.jpg")
+
+    if os.path.exists(bg_path):
+
+        with open(bg_path,"rb") as img_file:
+            bg_base64=base64.b64encode(img_file.read()).decode()
+
+        st.markdown(f"""
+        <style>
+
+        [data-testid="stAppViewContainer"] {{
+            background-image: url("data:image/jpg;base64,{bg_base64}");
+            background-size: cover;
+            background-position: center;
+        }}
+
+        [data-testid="stAppViewContainer"]::before {{
+            content:"";
+            position:fixed;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background:rgba(255,255,255,{1-bg_opacity});
+            pointer-events:none;
+        }}
+
+        div.stButton > button {{
+            background-color:white;
+            color:black;
+            border:{border_width}px solid black;
+            border-radius:8px;
+            height:80px;
+            width:100%;
+            font-size:16px;
+            font-weight:600;
+        }}
+
+        div.stButton > button:hover {{
+            background-color:#f2f2f2;
+        }}
+
+        /* Force square homepage logo */
+        [data-testid="stImage"] img {{
+            border-radius:0px !important;
+        }}
+
+        </style>
+        """,unsafe_allow_html=True)
+
+    col1,col2=st.columns([8,1])
+
+    with col1:
+        st.title("Weather Data Portal")
+
+    with col2:
+        logo_path=os.path.join("data","logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path,width=100)
+
+    st.write("")
+    st.write("")
+
+    # ===== centered first row =====
+    space1, colA, colB, space2 = st.columns([2,3,3,2])
+
+    with colA:
+        if st.button("Download IMD Gridded Weather Data\n(Single Location)"):
+            st.session_state.mode="download"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Single Location Data Download"
+            st.rerun()
+
+    with colB:
+        if st.button("Download IMD Gridded Weather Data\n(Multiple Locations)"):
+            st.session_state.mode="download_multi"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Multiple Locations Data Download"
+            st.rerun()
+
+    st.write("")
+
+    # ===== centered second row =====
+    space3, colC, space4 = st.columns([4,3,3])
+
+    with colC:
+        if st.button("View IMD Gridded Weather Data"):
+            st.session_state.mode="view"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
+            st.rerun()
 # ================= DASHBOARD =================
 elif st.session_state.page=="dashboard":
 
