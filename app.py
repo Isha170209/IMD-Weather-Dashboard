@@ -147,30 +147,24 @@ if st.session_state.page=="login":
 
         if st.button("Login"):
 
-            login_type = authenticate(email,password)
+    login_type = authenticate(email,password)
 
-if login_type:
+    if login_type:
 
-    st.session_state.logged_in=True
-    st.session_state.user_email=email
+        st.session_state.logged_in=True
+        st.session_state.user_email=email
 
-    if login_type=="admin":
-        st.session_state.page="admin"
+        if login_type=="admin":
+            st.session_state.page="admin"
+        else:
+            st.session_state.page="home"
+
+        st.success("Login successful")
+        st.rerun()
 
     else:
-        st.session_state.page="home"
-
-    st.success("Login successful")
-    st.rerun()
-
-else:
-    st.error("Invalid email or password")
-                st.success("Login successful")
-                st.rerun()
-
-            else:
-                st.error("Invalid email or password")
-
+        st.error("Invalid email or password")
+       
     with tab2:
 
         new_email=st.text_input("Register Email")
