@@ -204,11 +204,16 @@ elif st.session_state.page=="dashboard":
     # Reset background to white
     st.markdown("""
     <style>
+    /* White background for dashboard */
     [data-testid="stAppViewContainer"]{
-        background:white;
+    background:white;
     }
-    </style>
-    """,unsafe_allow_html=True)
+   /* Force square logo on dashboard pages */
+   [data-testid="stImage"] img{
+       border-radius:0px !important;
+    }
+</style>
+""",unsafe_allow_html=True)
 
     col1,col2=st.columns([8,2])
 
