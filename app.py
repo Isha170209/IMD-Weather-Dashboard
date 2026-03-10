@@ -8,14 +8,85 @@ from scipy.spatial import cKDTree
 import folium
 from streamlit_folium import st_folium
 import base64
+import hashlib
 
 st.set_page_config(layout="wide")
 
+# ================= USER DATABASE =================
+USER_DB="users.csv"
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def load_users():
+    if os.path.exists(USER_DB):
+        return pd.read_csv(USER_DB)
+    else:
+        return pd.DataFrame(columns=["email","password"])
+
+def save_user(email,password):
+    df=load_users()
+    new_user=pd.DataFrame([[email,hash_password(password)]],columns=["email","password"])
+    df=pd.concat([df,new_user])
+    df.to_csv(USER_DB,index=False)
+
+def authenticate(email,password):
+    df=load_users()
+    hashed=hash_password(password)
+    return ((df["email"]==email)&(df["password"]==hashed)).any()
+
 # ================= SESSION STATE =================
-for key, default in [("page","home"), ("mode","view"), ("submitted",False), ("view_submit",False), ("dashboard_title","")]:
+for key, default in [
+    ("page","login"),
+    ("mode","view"),
+    ("submitted",False),
+    ("view_submit",False),
+    ("dashboard_title",""),
+    ("logged_in",False)
+]:
     if key not in st.session_state:
         st.session_state[key]=default
 
+
+# ================= LOGIN PAGE =================
+if st.session_state.page=="login":
+
+    st.title("Weather Data Portal Login")
+
+    tab1,tab2=st.tabs(["Login","Register"])
+
+    with tab1:
+
+        email=st.text_input("Email")
+        password=st.text_input("Password",type="password")
+
+        if st.button("Login"):
+
+            if authenticate(email,password):
+
+                st.session_state.logged_in=True
+                st.session_state.page="home"
+                st.success("Login successful")
+                st.rerun()
+
+            else:
+                st.error("Invalid email or password")
+
+    with tab2:
+
+        new_email=st.text_input("Register Email")
+        new_pass=st.text_input("Create Password",type="password")
+
+        if st.button("Register"):
+
+            df=load_users()
+
+            if new_email in df["email"].values:
+                st.warning("User already exists")
+
+            else:
+                save_user(new_email,new_pass)
+                st.success("Registration successful. Please login.")
 
 # ================= COLOR FUNCTIONS =================
 def rain_color(val):
@@ -67,7 +138,6 @@ def add_legend(map_obj, parameter):
         </div>
         """
     map_obj.get_root().html.add_child(folium.Element(legend_html))
-
 
 # ================= GRID DRAW =================
 def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
@@ -212,9 +282,9 @@ if st.session_state.page=="home":
             st.session_state.page="dashboard"
             st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
             st.rerun()
-# ================= DASHBOARD =================
-elif st.session_state.page=="dashboard":
 
+# ================= DASHBOARD =================
+if st.session_state.page=="dashboard":
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"]{
