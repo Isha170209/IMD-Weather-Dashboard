@@ -14,7 +14,7 @@ import base64
 
 # ================= STYLE =================
 # Background transparency control (0 = very light image, 1 = dark overlay)
-bg_opacity = 0.15
+bg_opacity = 0.50
 
 bg_path = os.path.join("data", "bg.jpg")
 
