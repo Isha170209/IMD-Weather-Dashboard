@@ -11,37 +11,38 @@ from streamlit_folium import st_folium
 st.set_page_config(layout="wide")
 
 # ================= STYLE =================
-# Transparency control for background image (0.0 to 1.0)
-bg_opacity = 0.60  # Adjust this value to make the background lighter/darker
+# Transparency control for background image (0.0 = fully transparent, 1.0 = fully opaque)
+bg_opacity = 0.15  # adjust for light/faded effect
 
 bg_path = os.path.join("data", "bg.jpg")
-bg_css = ""
 if os.path.exists(bg_path):
-    bg_css = f"""
-    <style>
-    [data-testid="stAppViewContainer"] {{
-        background-image: url("data:bg.jpg");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        opacity: 1;
-    }}
-    [data-testid="stAppViewContainer"]::before {{
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(255,255,255,{1-bg_opacity});
-        z-index: -1;
-    }}
-    img {{border-radius:0px !important;}}
-    h1 {{margin-top: -30px !important;}}  /* Moves title up */
-    [data-testid="stImage"] {{margin-top: -15px !important;}}  /* Moves logo up */
-    </style>
-    """
-st.markdown(bg_css, unsafe_allow_html=True)
+    bg_url = f"data:image/jpg;base64,{open(bg_path,'rb').read().encode('base64')}"  # optional, else just use relative path
+    st.markdown(
+        f"""
+        <style>
+        /* Background only for home page */
+        [data-testid="stAppViewContainer"] > div:first-child {{
+            background-image: url('data/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+        }}
+        [data-testid="stAppViewContainer"] > div:first-child::before {{
+            content: "";
+            position: absolute;
+            top:0; left:0;
+            width:100%; height:100%;
+            background-color: rgba(255,255,255,{1-bg_opacity});
+            z-index: -1;
+        }}
+        img {{border-radius:0px !important;}}
+        h1 {{margin-top: -30px !important;}}
+        [data-testid="stImage"] {{margin-top: -15px !important;}}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ================= COLOR FUNCTIONS =================
 def rain_color(val):
