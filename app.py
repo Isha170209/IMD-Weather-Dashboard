@@ -250,7 +250,7 @@ elif st.session_state.page=="dashboard":
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
-
+    
 # ================= VIEW =================
     if st.session_state.mode=="view":
 
@@ -264,17 +264,28 @@ elif st.session_state.page=="dashboard":
         year_start=pd.to_datetime(f"{selected_year}-01-01")
         year_end=pd.to_datetime(f"{selected_year}-12-31")
 
-        selected_date=st.sidebar.date_input("Select Date",value=year_start,min_value=year_start,max_value=year_end)
+        selected_date=st.sidebar.date_input(
+            "Select Date",
+            value=year_start,
+            min_value=year_start,
+            max_value=year_end
+        )
 
         lat_input=st.sidebar.text_input("Latitude")
         lon_input=st.sidebar.text_input("Longitude")
 
         submit_view=st.sidebar.button("Submit")
 
+        # store submit state
         if submit_view:
+            st.session_state.view_submit=True
+            st.session_state.lat_val=float(lat_input)
+            st.session_state.lon_val=float(lon_input)
 
-            lat_val=float(lat_input)
-            lon_val=float(lon_input)
+        if st.session_state.view_submit:
+
+            lat_val=st.session_state.lat_val
+            lon_val=st.session_state.lon_val
 
             grid_points=df[["lat","lon"]].drop_duplicates().values
             tree=cKDTree(grid_points)
@@ -298,7 +309,6 @@ elif st.session_state.page=="dashboard":
 
             draw_india_grid(map_obj,df_subset,parameter,selected_date,resolution)
 
-            # exact searched location marker
             folium.Marker(
                 location=[lat_val,lon_val],
                 popup="Searched Location",
@@ -311,7 +321,7 @@ elif st.session_state.page=="dashboard":
 
         else:
             st.info("Enter latitude and longitude and click Submit to view map.")
-
+            
 # ================= DOWNLOAD SINGLE =================
     elif st.session_state.mode=="download":
         selected_years=st.sidebar.multiselect("Select Years",years,default=[years[0]])
