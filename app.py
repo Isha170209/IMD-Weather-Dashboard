@@ -214,7 +214,7 @@ elif st.session_state.page=="dashboard":
 
     with col1:
         st.title(st.session_state.dashboard_title)
-
+        
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
