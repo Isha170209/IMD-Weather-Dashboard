@@ -140,7 +140,7 @@ if st.session_state.page=="home":
 # ================= DASHBOARD =================
 elif st.session_state.page=="dashboard":
     col1,col2=st.columns([8,2])
-    with col1: st.title(st.session_state.dashboard_title)  # Dynamic title
+    with col1: st.title(st.session_state.dashboard_title)
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path): st.image(logo_path,width=100)
@@ -228,8 +228,10 @@ elif st.session_state.page=="dashboard":
             all_data=row.sort_values("date")
             st.subheader("Tabular Data")
             st.dataframe(all_data)
+            # Dynamic CSV filename: parameter_lat_lon.csv
+            csv_filename=f"{parameter}_{grid_lat}_{grid_lon}.csv"
             csv=all_data.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV",csv,"imd_gridded_weather_data.csv","text/csv")
+            st.download_button("Download CSV",csv,csv_filename,"text/csv")
             st.subheader("Graphical Data")
             fig,ax=plt.subplots(figsize=(10,4))
             ax.plot(all_data["date"],all_data[parameter],marker="x")
@@ -248,6 +250,7 @@ elif st.session_state.page=="dashboard":
         if uploaded_file:
             loc_df=pd.read_csv(uploaded_file)
             loc_df.columns=loc_df.columns.str.strip()
+            original_file_name=os.path.splitext(os.path.basename(uploaded_file.name))[0]  # for dynamic naming
             df_list=[]
             for year in selected_years:
                 file=glob.glob(os.path.join("data",parameter,f"{year}*.parquet"))[0]
@@ -271,8 +274,10 @@ elif st.session_state.page=="dashboard":
             final_df=pd.concat(results)
             st.subheader("Tabular Data")
             st.dataframe(final_df)
+            # Dynamic CSV filename: parameter_originalfilename.csv
+            csv_filename=f"{parameter}_{original_file_name}.csv"
             csv=final_df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV",csv,"imd_multiple_locations.csv","text/csv")
+            st.download_button("Download CSV",csv,csv_filename,"text/csv")
             st.subheader("Graph")
             fig,ax=plt.subplots(figsize=(10,5))
             for loc in final_df["Location"].unique():
