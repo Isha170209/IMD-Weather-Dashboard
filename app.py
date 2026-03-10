@@ -46,9 +46,18 @@ def save_user(email,password):
     df.to_csv(USER_DB,index=False)
 
 def authenticate(email,password):
+
+    # Admin login
+    if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+        return "admin"
+
     df=load_users()
     hashed=hash_password(password)
-    return ((df["email"]==email)&(df["password"]==hashed)).any()
+
+    if ((df["email"]==email)&(df["password"]==hashed)).any():
+        return "user"
+
+    return None
 
 def update_password(email,new_password):
     df=load_users()
