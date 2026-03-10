@@ -11,6 +11,14 @@ import base64
 import hashlib
 
 st.set_page_config(layout="wide")
+# ===== FORCE SQUARE CORNER LOGO =====
+st.markdown("""
+<style>
+img {
+    border-radius: 0px !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ================= USER DATABASE =================
 USER_DB="users.csv"
@@ -150,7 +158,6 @@ if st.session_state.page=="login":
                 save_user(new_email,new_pass)
                 st.success("Registration successful. Please login.")
 
-
 # ================= PROFILE PAGE =================
 if st.session_state.page=="profile":
 
@@ -240,7 +247,6 @@ def add_legend(map_obj, parameter):
         </div>
         """
     map_obj.get_root().html.add_child(folium.Element(legend_html))
-
 
 # ================= GRID DRAW =================
 def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
