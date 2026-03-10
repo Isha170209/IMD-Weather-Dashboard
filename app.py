@@ -14,16 +14,6 @@ st.set_page_config(layout="wide")
 st.markdown("""
 <style>
 img {border-radius:0px !important;}
-.stButton>button {
-    background-color: #4CAF50;
-    color: white;
-    border-radius: 8px;
-    padding: 6px 12px;
-    margin: 4px 0;
-}
-.stButton>button:hover {
-    background-color: #45a049;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -86,23 +76,22 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         value=row[parameter]
         color=rain_color(value) if parameter=="rain" else temp_color(value)
         polygon=[
-            [lon-resolution/2,lat-resolution/2],
-            [lon+resolution/2,lat-resolution/2],
-            [lon+resolution/2,lat+resolution/2],
-            [lon-resolution/2,lat+resolution/2],
-            [lon-resolution/2,lat-resolution/2]
+        [lon-resolution/2,lat-resolution/2],
+        [lon+resolution/2,lat-resolution/2],
+        [lon+resolution/2,lat+resolution/2],
+        [lon-resolution/2,lat+resolution/2],
+        [lon-resolution/2,lat-resolution/2]
         ]
         feature={
-            "type":"Feature",
-            "properties":{
-                "Grid":f"Lat:{lat}<br>Lon:{lon}<br>{parameter}:{value}",
-                "style":{
-                    "fillColor":color,
-                    "color":"black",
-                    "weight":0.3,
-                    "fillOpacity":0.7
-                }},
-            "geometry":{"type":"Polygon","coordinates":[polygon]}
+        "type":"Feature",
+        "properties":{
+        "Grid":f"Lat:{lat}<br>Lon:{lon}<br>{parameter}:{value}",
+        "style":{
+        "fillColor":color,
+        "color":"black",
+        "weight":0.3,
+        "fillOpacity":0.7}},
+        "geometry":{"type":"Polygon","coordinates":[polygon]}
         }
         features.append(feature)
     geojson={"type":"FeatureCollection","features":features}
@@ -113,10 +102,14 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
     ).add_to(map_obj)
 
 # ================= SESSION STATE =================
-if "page" not in st.session_state: st.session_state.page="home"
-if "mode" not in st.session_state: st.session_state.mode="view"
-if "submitted" not in st.session_state: st.session_state.submitted=False
-if "view_submit" not in st.session_state: st.session_state.view_submit=False
+if "page" not in st.session_state:
+    st.session_state.page="home"
+if "mode" not in st.session_state:
+    st.session_state.mode="view"
+if "submitted" not in st.session_state:
+    st.session_state.submitted=False
+if "view_submit" not in st.session_state:
+    st.session_state.view_submit=False
 
 # ================= HOME =================
 if st.session_state.page=="home":
@@ -139,46 +132,21 @@ if st.session_state.page=="home":
 
 # ================= DASHBOARD =================
 elif st.session_state.page=="dashboard":
-    # ===== Top row: title + logo =====
     col1,col2=st.columns([8,2])
     with col1: st.title("IMD Gridded Data")
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path): st.image(logo_path,width=100)
-
     GRID_CONFIG={"rain":{"resolution":0.25},"tmax":{"resolution":1.0},"tmin":{"resolution":1.0}}
-
-    # ===== Horizontal filter layout =====
-    st.markdown("### Filters")
-    filter_cols = st.columns([1.5,1.5,1.5,1.5,1,1,1.2,1.2])
-    
-    parameter=filter_cols[0].selectbox("Parameter",["rain","tmax","tmin"])
+    st.sidebar.header("Filters")
+    if st.sidebar.button("🏠 Home"):
+        st.session_state.page="home"; st.rerun()
+    parameter=st.sidebar.selectbox("Select Parameter",["rain","tmax","tmin"])
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
-    
-    selected_year = filter_cols[1].selectbox("Year", years) if st.session_state.mode=="view" else filter_cols[1].multiselect("Years", years, default=[years[0]])
 
-    # Restrict date pickers to selected year(s)
-    if isinstance(selected_year, list):
-        min_date=pd.to_datetime(f"{min(selected_year)}-01-01")
-        max_date=pd.to_datetime(f"{max(selected_year)}-12-31")
-    else:
-        min_date=pd.to_datetime(f"{selected_year}-01-01")
-        max_date=pd.to_datetime(f"{selected_year}-12-31")
-    
-    start_date = filter_cols[2].date_input("Start Date", value=min_date, min_value=min_date, max_value=max_date)
-    end_date = filter_cols[3].date_input("End Date", value=max_date, min_value=min_date, max_value=max_date)
-
-    lat_input = filter_cols[4].text_input("Min Latitude")
-    lat_max_input = filter_cols[5].text_input("Max Latitude")
-    lon_input = filter_cols[6].text_input("Min Longitude")
-    lon_max_input = filter_cols[7].text_input("Max Longitude")
-
-    submit_button = st.button("Submit Filters")
-
-    # ===== Logic remains same as before, only horizontal layout =====
-    # ================= VIEW =================
+# ================= VIEW =================
     if st.session_state.mode=="view":
         selected_year=st.sidebar.selectbox("Select Year",years)
         file=glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
@@ -306,4 +274,3 @@ elif st.session_state.page=="dashboard":
                 ax.plot(subset["date"],subset[parameter],label=loc)
             ax.legend(); ax.grid(True)
             st.pyplot(fig)
-
