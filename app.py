@@ -116,11 +116,13 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
     ).add_to(map_obj)
 
 
+
 # ================= HOME =================
 if st.session_state.page=="home":
 
-    # Background transparency control
     bg_opacity = 0.5
+    border_width = 3
+
     bg_path=os.path.join("data","bg.jpg")
 
     if os.path.exists(bg_path):
@@ -149,16 +151,21 @@ if st.session_state.page=="home":
             pointer-events:none;
         }}
 
-        img {{
-        border-radius:0px !important;
+        div.stButton > button {{
+            background-color:white;
+            color:black;
+            border:{border_width}px solid black;
+            border-radius:8px;
+            height:80px;
+            width:100%;
+            font-size:16px;
+            font-weight:600;
         }}
 
-        h1 {{
-        margin-top:-30px !important;
-        }}
-
-        [data-testid="stImage"] {{
-        margin-top:-15px !important;
+        div.stButton > button:hover {{
+            background-color:#f2f2f2;
+            border:{border_width}px solid black;
+            color:black;
         }}
 
         </style>
@@ -174,31 +181,38 @@ if st.session_state.page=="home":
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
 
-    colA,colB,colC=st.columns(3)
+    st.write("")
+
+    # ===== First row =====
+    colA,colB=st.columns([1,1])
 
     with colA:
+        if st.button("Download IMD Gridded Weather Data\n(Single Location)"):
+            st.session_state.mode="download"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Single Location Data Download"
+            st.rerun()
+
+    with colB:
+        if st.button("Download IMD Gridded Weather Data\n(Multiple Locations)"):
+            st.session_state.mode="download_multi"
+            st.session_state.page="dashboard"
+            st.session_state.dashboard_title="Multiple Locations Data Download"
+            st.rerun()
+
+    st.write("")
+
+    # ===== Second row centered =====
+    colX,colY,colZ=st.columns([1,1,1])
+
+    with colY:
         if st.button("View IMD Gridded Weather Data"):
             st.session_state.mode="view"
             st.session_state.page="dashboard"
             st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
             st.rerun()
 
-    with colB:
-        if st.button("Download IMD Gridded Weather Data (Single Location)"):
-            st.session_state.mode="download"
-            st.session_state.page="dashboard"
-            st.session_state.dashboard_title="Single Location Data Download"
-            st.rerun()
-
-    with colC:
-        if st.button("Download IMD Gridded Weather Data (Multiple Locations)"):
-            st.session_state.mode="download_multi"
-            st.session_state.page="dashboard"
-            st.session_state.dashboard_title="Multiple Locations Data Download"
-            st.rerun()
-
-
-# ================= DASHBOARD =================
+    # ================= DASHBOARD =================
 elif st.session_state.page=="dashboard":
 
     # Reset background to white
