@@ -172,7 +172,7 @@ if st.session_state.page=="home":
         </style>
         """,unsafe_allow_html=True)
 
-    col1,col2=st.columns([8,2])
+    col1,col2=st.columns([8,1])
 
     with col1:
         st.title("Weather Dashboard")
