@@ -22,6 +22,8 @@ img {
 
 # ================= USER DATABASE =================
 USER_DB=os.path.join("data","users.csv")
+if not os.path.exists(USER_DB):
+    pd.DataFrame(columns=["email","password"]).to_csv(USER_DB,index=False)
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
