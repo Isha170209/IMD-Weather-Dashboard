@@ -14,6 +14,8 @@ st.set_page_config(layout="wide")
 st.markdown("""
 <style>
 img {border-radius:0px !important;}
+h1 {margin-top: -30px !important;}  /* Moves title up */
+[data-testid="stImage"] {margin-top: -15px !important;}  /* Moves logo up */
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,22 +78,24 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         value=row[parameter]
         color=rain_color(value) if parameter=="rain" else temp_color(value)
         polygon=[
-        [lon-resolution/2,lat-resolution/2],
-        [lon+resolution/2,lat-resolution/2],
-        [lon+resolution/2,lat+resolution/2],
-        [lon-resolution/2,lat+resolution/2],
-        [lon-resolution/2,lat-resolution/2]
+            [lon-resolution/2,lat-resolution/2],
+            [lon+resolution/2,lat-resolution/2],
+            [lon+resolution/2,lat+resolution/2],
+            [lon-resolution/2,lat+resolution/2],
+            [lon-resolution/2,lat-resolution/2]
         ]
         feature={
-        "type":"Feature",
-        "properties":{
-        "Grid":f"Lat:{lat}<br>Lon:{lon}<br>{parameter}:{value}",
-        "style":{
-        "fillColor":color,
-        "color":"black",
-        "weight":0.3,
-        "fillOpacity":0.7}},
-        "geometry":{"type":"Polygon","coordinates":[polygon]}
+            "type":"Feature",
+            "properties":{
+                "Grid":f"Lat:{lat}<br>Lon:{lon}<br>{parameter}:{value}",
+                "style":{
+                    "fillColor":color,
+                    "color":"black",
+                    "weight":0.3,
+                    "fillOpacity":0.7
+                }
+            },
+            "geometry":{"type":"Polygon","coordinates":[polygon]}
         }
         features.append(feature)
     geojson={"type":"FeatureCollection","features":features}
@@ -102,14 +106,8 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
     ).add_to(map_obj)
 
 # ================= SESSION STATE =================
-if "page" not in st.session_state:
-    st.session_state.page="home"
-if "mode" not in st.session_state:
-    st.session_state.mode="view"
-if "submitted" not in st.session_state:
-    st.session_state.submitted=False
-if "view_submit" not in st.session_state:
-    st.session_state.view_submit=False
+for key, default in [("page","home"), ("mode","view"), ("submitted",False), ("view_submit",False)]:
+    if key not in st.session_state: st.session_state[key]=default
 
 # ================= HOME =================
 if st.session_state.page=="home":
@@ -118,7 +116,7 @@ if st.session_state.page=="home":
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path): st.image(logo_path,width=100)
-    st.write("")
+    
     colA,colB,colC=st.columns(3)
     with colA:
         if st.button("View IMD Gridded Weather Data"):
@@ -137,6 +135,7 @@ elif st.session_state.page=="dashboard":
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path): st.image(logo_path,width=100)
+
     GRID_CONFIG={"rain":{"resolution":0.25},"tmax":{"resolution":1.0},"tmin":{"resolution":1.0}}
     st.sidebar.header("Filters")
     if st.sidebar.button("🏠 Home"):
@@ -151,7 +150,6 @@ elif st.session_state.page=="dashboard":
         selected_year=st.sidebar.selectbox("Select Year",years)
         file=glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
         df=pd.read_parquet(file); df["date"]=pd.to_datetime(df["date"])
-        # Restrict date picker to selected year
         year_start=pd.to_datetime(f"{selected_year}-01-01")
         year_end=pd.to_datetime(f"{selected_year}-12-31")
         selected_date=st.sidebar.date_input("Select Date",value=year_start,min_value=year_start,max_value=year_end)
@@ -176,8 +174,8 @@ elif st.session_state.page=="dashboard":
             center_lat=(lat_min+lat_max)/2
             center_lon=(lon_min+lon_max)/2
             map_obj=folium.Map(location=[center_lat,center_lon],zoom_start=6,
-            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            attr="Esri Satellite")
+                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attr="Esri Satellite")
             draw_india_grid(map_obj,df,parameter,selected_date,resolution)
             add_legend(map_obj,parameter)
             st_folium(map_obj,height=650,width=1100)
@@ -199,7 +197,6 @@ elif st.session_state.page=="dashboard":
             return pd.concat(df_list)
         df=load_years_data(parameter,selected_years)
         if df.empty: st.error("No data available."); st.stop()
-        # Restrict start/end dates to selected years
         min_date=pd.to_datetime(f"{min(selected_years)}-01-01")
         max_date=pd.to_datetime(f"{max(selected_years)}-12-31")
         start_date=st.sidebar.date_input("Start Date",value=min_date,min_value=min_date,max_value=max_date)
