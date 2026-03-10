@@ -174,7 +174,7 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
 
 
 # ================= HOME =================
-elif st.session_state.page=="home":
+if st.session_state.page=="home":
 
     bg_opacity = 0.5
     border_width = 2
@@ -243,8 +243,7 @@ elif st.session_state.page=="home":
 
 # ================= DASHBOARD =================
 # ================= DASHBOARD =================
-elif st.session_state.page=="dashboard":
-
+if st.session_state.page=="dashboard":
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"]{
