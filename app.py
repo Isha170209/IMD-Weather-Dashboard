@@ -21,7 +21,7 @@ img {
 """, unsafe_allow_html=True)
 
 # ================= USER DATABASE =================
-USER_DB="users.csv"
+USER_DB=os.path.join("data","users.csv")
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
