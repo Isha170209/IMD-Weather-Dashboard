@@ -124,10 +124,10 @@ if st.session_state.page=="home":
         if st.button("View IMD Gridded Weather Data"):
             st.session_state.mode="view"; st.session_state.page="dashboard"; st.rerun()
     with colB:
-        if st.button("Download IMD Gridded Weather Data"):
+        if st.button("Download IMD Gridded Weather Data (Single Location)"):
             st.session_state.mode="download"; st.session_state.page="dashboard"; st.rerun()
     with colC:
-        if st.button("Download IMD Data (Multiple Locations)"):
+        if st.button("Download IMD Gridded Weather Data (Multiple Locations)"):
             st.session_state.mode="download_multi"; st.session_state.page="dashboard"; st.rerun()
 
 # ================= DASHBOARD =================
