@@ -12,7 +12,7 @@ st.set_page_config(layout="wide")
 
 # ================= STYLE =================
 # Transparency control for background image (0.0 to 1.0)
-bg_opacity = 0.15  # Adjust this value to make the background lighter/darker
+bg_opacity = 0.60  # Adjust this value to make the background lighter/darker
 
 bg_path = os.path.join("data", "bg.jpg")
 bg_css = ""
