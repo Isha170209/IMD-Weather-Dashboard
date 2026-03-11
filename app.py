@@ -69,7 +69,34 @@ def update_password(email,new_password):
     df=load_users()
     df.loc[df["email"]==email,"password"]=hash_password(new_password)
     df.to_csv(USER_DB,index=False)
-    
+
+# ================= SEND REGISTRATION EMAIL =================
+def send_registration_email(receiver_email):
+    subject = "Weather Data Portal Registration Successful"
+    body = f"""
+Hello,
+You have successfully registered on the Weather Data Portal.
+You can now login using:
+Email : {receiver_email}
+Use the password you created during registration.
+Thank you for using the portal.
+Regards
+Weather Data Portal Team
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = receiver_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
+        server.quit()
+    except Exception as e:
+        print("Email sending failed:", e)
+
 # ================= SESSION STATE =================
 for key, default in [
     ("page","login"),
@@ -170,18 +197,17 @@ if st.session_state.page=="login":
         st.markdown('</div>', unsafe_allow_html=True)
         
     # ---------- REGISTER TAB ----------
-    with tab2:
-        new_email=st.text_input("Register Email")
-        new_pass=st.text_input("Create Password",type="password")
-        if st.button("Register", help="Create Account"):
-            df=load_users()
-            if new_email in df["email"].values:
-                st.warning("User already exists")
-            else:
-                save_user(new_email,new_pass)
-                st.success("Registration successful. Please login.")
-            st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("Register", help="Create Account"):
+    df=load_users()
+    if new_email in df["email"].values:
+        st.warning("User already exists")
+    else:
+        save_user(new_email,new_pass)
 
+        # send registration email
+        send_registration_email(new_email)
+
+        st.success("Registration successful. Confirmation email sent.")
 # ================= PROFILE PAGE =================
 if st.session_state.page=="profile":
     apply_background()
