@@ -79,7 +79,6 @@ You have successfully registered on the Weather Data Portal.
 You can now login using:
 Email : {receiver_email}
 Use the password you created during registration.
-Thank you for using the portal.
 Regards
 Weather Data Portal Team
 """
@@ -89,13 +88,14 @@ Weather Data Portal Team
         msg["To"] = receiver_email
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain"))
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
         server.quit()
+        print("Email sent successfully")
     except Exception as e:
-        print("Email sending failed:", e)
+        print("Email error:", e)
 
 # ================= SESSION STATE =================
 for key, default in [
