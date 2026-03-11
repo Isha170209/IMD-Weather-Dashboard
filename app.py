@@ -193,7 +193,7 @@ if st.session_state.page=="login":
         new_email=st.text_input("Register Email")
         new_pass=st.text_input("Create Password",type="password")
 
-        if st.button("Register"):
+        if st.button("Register", help="Create Account"):
 
             df=load_users()
 
@@ -203,6 +203,7 @@ if st.session_state.page=="login":
             else:
                 save_user(new_email,new_pass)
                 st.success("Registration successful. Please login.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= PROFILE PAGE =================
 if st.session_state.page=="profile":
