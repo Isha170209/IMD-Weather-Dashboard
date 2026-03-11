@@ -367,7 +367,7 @@ if st.session_state.page=="admin":
         st.markdown("---")
         # ===== TABLE ROWS =====
         for index,row in df.iterrows():
-            col1,col2,col3,col4 = st.columns([5,2,2,2])
+            col1,col2,col3,col4,col5 = st.columns([5,2,2,2,2])
             col1.write(row["email"])
             col2.write(row["status"])
             # Disable button
