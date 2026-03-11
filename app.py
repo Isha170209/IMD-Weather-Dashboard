@@ -354,6 +354,14 @@ if st.session_state.page=="admin":
             st.image(logo_path,width=100)
     st.write("### Registered Users")
     df = load_users()
+    # ===== DOWNLOAD BUTTON =====
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download Users Table",
+        csv,
+        "registered_users.csv",
+        "text/csv"
+    )
     if df.empty:
         st.info("No users registered yet.")
     else:
