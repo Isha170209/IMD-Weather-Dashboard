@@ -377,10 +377,10 @@ if st.session_state.page=="home":
     st.write("")
 
     # ===== PROFILE BUTTON =====
-    profile_col1,profile_col2,profile_col3=st.columns([6,0.6,0.6])
+    profile_col1,profile_col2,profile_col3=st.columns([10,0.5,0.5])
 
     with profile_col2:
-        if st.button("My Profile"):
+        if st.button("👤"):
             st.session_state.page="profile"
             st.rerun()
 
