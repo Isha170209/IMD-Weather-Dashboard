@@ -303,7 +303,7 @@ if st.session_state.page=="admin":
     # ===== DOWNLOAD BUTTON =====
     csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "⬇",
+        "Download table",
         csv,
         "registered_users.csv",
         "text/csv"
