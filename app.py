@@ -188,7 +188,9 @@ if st.session_state.page=="login":
         st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
         if st.button("↪", help="Login"):
             login_type = authenticate(email,password)
-            if login_type:
+            if login_type == "disabled":
+                st.error("Your account has been disabled by the administrator.")
+            elif login_type:
                 st.session_state.logged_in=True
                 st.session_state.user_email=email
                 st.session_state.login_type=login_type
