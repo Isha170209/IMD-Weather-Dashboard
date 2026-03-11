@@ -351,17 +351,31 @@ if st.session_state.page=="admin":
             st.image(logo_path,width=100)
 
     st.write("### Registered Users")
-
     df = load_users()
-
     if df.empty:
         st.info("No users registered yet.")
     else:
-        st.dataframe(df[["email"]])
-
-    st.write("Total Registered Users:", len(df))
-
-    st.write("")
+        for index,row in df.iterrows():
+            col1,col2,col3,col4=st.columns([5,2,2,2])
+            col1.write(row["email"])
+            col2.write(row["status"])
+            if col3.button("Disable",key=f"disable{index}"):
+                df.loc[index,"status"]="disabled"
+                df.to_csv(USER_DB,index=False)
+                st.rerun()
+            if col4.button("Delete",key=f"delete{index}"):
+                df=df.drop(index)
+                df.to_csv(USER_DB,index=False)
+                st.rerun()
+    #----------------------------#
+    #st.write("### Registered Users")
+    #df = load_users()
+    #if df.empty:
+        #st.info("No users registered yet.")
+    #else:
+        #st.dataframe(df[["email"]])
+    #st.write("Total Registered Users:", len(df))
+    #st.write("")
 
     colA,colB = st.columns(2)
 
