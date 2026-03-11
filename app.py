@@ -164,25 +164,23 @@ if st.session_state.page=="login":
         email=st.text_input("Email")
         password=st.text_input("Password",type="password")
 
-        if st.button("↪"):
+        st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
 
+        if st.button("↪", help="Login"):
             login_type = authenticate(email,password)
-
             if login_type:
-
                 st.session_state.logged_in=True
                 st.session_state.user_email=email
-
                 if login_type=="admin":
                     st.session_state.page="admin"
                 else:
                     st.session_state.page="home"
-
                 st.success("Login successful")
                 st.rerun()
-
             else:
                 st.error("Invalid email or password")
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------- REGISTER TAB ----------
     with tab2:
