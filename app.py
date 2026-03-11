@@ -122,6 +122,25 @@ def apply_background():
         </style>
         """,unsafe_allow_html=True)
 
+        st.markdown("""
+        <style>
+
+        /* icon buttons without box */
+        .icon-btn button{
+            background:none !important;
+            border:none !important;
+            box-shadow:none !important;
+            font-size:28px;
+            padding:0px;
+        }
+        /* remove hover box */
+        .icon-btn button:hover{
+            background:none !important;
+            border:none !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
 # ================= LOGIN PAGE =================
 if st.session_state.page=="login":
 
@@ -379,16 +398,22 @@ if st.session_state.page=="home":
     # ===== PROFILE BUTTON =====
     profile_col1,profile_col2,profile_col3=st.columns([10,0.5,0.5])
 
+    st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+
     with profile_col2:
-        if st.button("👤"):
+        if st.button("👤", help="My Profile"):
             st.session_state.page="profile"
             st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    with profile_col3:
-        if st.button("⏻"):
-            st.session_state.logged_in=False
-            st.session_state.page="login"
-            st.rerun()
+    st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+
+   with profile_col3:
+       if st.button("⏻", help="Logout"):
+           st.session_state.logged_in=False
+           st.session_state.page="login"
+           st.rerun()
+   st.markdown('</div>', unsafe_allow_html=True)
 
     st.write("")
     st.write("")
