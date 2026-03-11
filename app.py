@@ -164,7 +164,7 @@ if st.session_state.page=="login":
         email=st.text_input("Email")
         password=st.text_input("Password",type="password")
 
-        if st.button("Login"):
+        if st.button("↪"):
 
             login_type = authenticate(email,password)
 
