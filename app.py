@@ -358,7 +358,7 @@ if st.session_state.page=="admin":
         st.info("No users registered yet.")
     else:
         # ===== TABLE HEADER =====
-        h1,h2,h3,h4 = st.columns([5,2,2,2,2])
+        h1,h2,h3,h4,h5 = st.columns([5,2,2,2,2])
         h1.markdown("**Email**")
         h2.markdown("**Status**")
         h3.markdown("**Disable**")
