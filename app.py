@@ -223,18 +223,18 @@ if st.session_state.page=="profile":
     new_pass=st.text_input("New Password",type="password")
     confirm_pass=st.text_input("Confirm New Password",type="password")
 
-    if st.button("Update Password"):
+    st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+    if st.button("Update Password", help="Update Password"):
 
-        if not authenticate(st.session_state.user_email,old_pass):
-            st.error("Old password incorrect")
-
-        elif new_pass!=confirm_pass:
-            st.error("New passwords do not match")
-
-        else:
-            update_password(st.session_state.user_email,new_pass)
-            st.success("Password updated successfully")
-
+       if not authenticate(st.session_state.user_email,old_pass):
+           st.error("Old password incorrect")
+       elif new_pass!=confirm_pass:
+           st.error("New passwords do not match")
+       else:
+           update_password(st.session_state.user_email,new_pass)
+           st.success("Password updated successfully")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     if st.button("🏠", help="Home"):
         st.session_state.page="home"
         st.rerun()
