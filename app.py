@@ -358,11 +358,12 @@ if st.session_state.page=="admin":
         st.info("No users registered yet.")
     else:
         # ===== TABLE HEADER =====
-        h1,h2,h3,h4 = st.columns([5,2,2,2])
+        h1,h2,h3,h4 = st.columns([5,2,2,2,2])
         h1.markdown("**Email**")
         h2.markdown("**Status**")
         h3.markdown("**Disable**")
-        h4.markdown("**Delete**")
+        h4.markdown("**Enable**")
+        h5.markdown("**Delete**")
         st.markdown("---")
         # ===== TABLE ROWS =====
         for index,row in df.iterrows():
@@ -377,8 +378,16 @@ if st.session_state.page=="admin":
                     df.to_csv(USER_DB,index=False)
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
-            # Delete button
+            # Enable button
             with col4:
+                st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+                if st.button("🟢", key=f"disable{index}", help="Enable User"):
+                    df.loc[index,"status"]="enabled"
+                    df.to_csv(USER_DB,index=False)
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            # Delete button
+            with col5:
                 st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
                 if st.button("🗑", key=f"delete{index}", help="Delete User"):
                     df=df.drop(index)
