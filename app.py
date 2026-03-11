@@ -29,10 +29,8 @@ ADMIN_PASSWORD = "abc@1234"
 USER_DB=os.path.join("data","users.csv")
 if not os.path.exists(USER_DB):
     pd.DataFrame(columns=["email","password","status"]).to_csv(USER_DB,index=False)
-
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
-
 def load_users():
     if os.path.exists(USER_DB):
         df = pd.read_csv(USER_DB)
@@ -43,32 +41,25 @@ def load_users():
         return df
     else:
         return pd.DataFrame(columns=["email","password","status"])
-
 def save_user(email,password):
     df=load_users()
     new_user=pd.DataFrame([[email,hash_password(password)]],columns=["email","password"])
     df=pd.concat([df,new_user])
     df.to_csv(USER_DB,index=False)
-
 def authenticate(email,password):
-
     # Admin login
     if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
         return "admin"
-
     df=load_users()
     hashed=hash_password(password)
-
     if ((df["email"]==email)&(df["password"]==hashed)).any():
         return "user"
-
     return None
-
 def update_password(email,new_password):
     df=load_users()
     df.loc[df["email"]==email,"password"]=hash_password(new_password)
     df.to_csv(USER_DB,index=False)
-
+    
 # ================= SESSION STATE =================
 for key, default in [
     ("page","login"),
@@ -82,26 +73,19 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key]=default
 
-
 # ================= BACKGROUND FUNCTION =================
 def apply_background():
-
     bg_path=os.path.join("data","bg.jpg")
-
     if os.path.exists(bg_path):
-
         with open(bg_path,"rb") as img_file:
             bg_base64=base64.b64encode(img_file.read()).decode()
-
         st.markdown(f"""
         <style>
-
         [data-testid="stAppViewContainer"] {{
             background-image: url("data:image/jpg;base64,{bg_base64}");
             background-size: cover;
             background-position: center;
         }}
-
         [data-testid="stAppViewContainer"]::before {{
             content:"";
             position:fixed;
@@ -112,7 +96,6 @@ def apply_background():
             background:rgba(255,255,255,0.5);
             pointer-events:none;
         }}
-
         div.stButton > button {{
             background-color:white;
             color:black;
@@ -123,13 +106,10 @@ def apply_background():
             font-size:16px;
             font-weight:600;
         }}
-
         </style>
         """,unsafe_allow_html=True)
-
         st.markdown("""
         <style>
-
         /* icon buttons without box */
         .icon-btn button{
             background:none !important;
@@ -148,29 +128,21 @@ def apply_background():
 
 # ================= LOGIN PAGE =================
 if st.session_state.page=="login":
-
     apply_background()
-
     col1,col2=st.columns([8,1])
-
     with col1:
         st.title("Weather Data Portal Login")
-
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
-
     tab1,tab2=st.tabs(["Login","Register"])
-
+    
     # ---------- LOGIN TAB ----------
     with tab1:
-
         email=st.text_input("Email")
         password=st.text_input("Password",type="password")
-
         st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-
         if st.button("↪", help="Login"):
             login_type = authenticate(email,password)
             if login_type:
@@ -185,22 +157,16 @@ if st.session_state.page=="login":
                 st.rerun()
             else:
                 st.error("Invalid email or password")
-
         st.markdown('</div>', unsafe_allow_html=True)
-
+        
     # ---------- REGISTER TAB ----------
     with tab2:
-
         new_email=st.text_input("Register Email")
         new_pass=st.text_input("Create Password",type="password")
-
         if st.button("Register", help="Create Account"):
-
             df=load_users()
-
             if new_email in df["email"].values:
                 st.warning("User already exists")
-
             else:
                 save_user(new_email,new_pass)
                 st.success("Registration successful. Please login.")
@@ -208,31 +174,22 @@ if st.session_state.page=="login":
 
 # ================= PROFILE PAGE =================
 if st.session_state.page=="profile":
-
     apply_background()
-
     col1,col2=st.columns([6,1])
-
     with col1:
         st.title("My Profile")
-
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
-
     st.write("### Login ID")
     st.info(st.session_state.user_email)
-
     st.write("### Change Password")
-
     old_pass=st.text_input("Old Password",type="password")
     new_pass=st.text_input("New Password",type="password")
     confirm_pass=st.text_input("Confirm New Password",type="password")
-
     st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
     if st.button("Update Password", help="Update Password"):
-
        if not authenticate(st.session_state.user_email,old_pass):
            st.error("Old password incorrect")
        elif new_pass!=confirm_pass:
@@ -241,7 +198,6 @@ if st.session_state.page=="profile":
            update_password(st.session_state.user_email,new_pass)
            st.success("Password updated successfully")
     st.markdown('</div>', unsafe_allow_html=True)
-    
     if st.button("🏠", help="Home"):
         st.session_state.page="home"
         st.rerun()
@@ -254,7 +210,6 @@ def rain_color(val):
     elif val >= 50: return "#6BAED6"
     elif val >= 10: return "#C6DBEF"
     else: return "#F7FBFF"
-
 def temp_color(val):
     if pd.isna(val): return "#ffffff"
     if val >= 40: return "#800026"
@@ -266,7 +221,6 @@ def temp_color(val):
      
 # ================= LEGEND =================
 def add_legend(map_obj, parameter):
-
     if parameter=="rain":
         legend_html="""
         <div style="position: fixed; bottom:30px; right:50px;
@@ -298,18 +252,13 @@ def add_legend(map_obj, parameter):
 
 # ================= GRID DRAW =================
 def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
-
     df_day=df[df["date"]==pd.to_datetime(selected_date)]
     features=[]
-
     for _,row in df_day.iterrows():
-
         lat=row["lat"]
         lon=row["lon"]
         value=row[parameter]
-
         color=rain_color(value) if parameter=="rain" else temp_color(value)
-
         polygon=[
             [lon-resolution/2,lat-resolution/2],
             [lon+resolution/2,lat-resolution/2],
@@ -317,7 +266,6 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
             [lon-resolution/2,lat+resolution/2],
             [lon-resolution/2,lat-resolution/2]
         ]
-
         feature={
             "type":"Feature",
             "properties":{
@@ -331,11 +279,8 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
             },
             "geometry":{"type":"Polygon","coordinates":[polygon]}
         }
-
         features.append(feature)
-
     geojson={"type":"FeatureCollection","features":features}
-
     folium.GeoJson(
         geojson,
         style_function=lambda x:x["properties"]["style"],
@@ -354,6 +299,7 @@ if st.session_state.page=="admin":
             st.image(logo_path,width=100)
     st.write("### Registered Users")
     df = load_users()
+    
     # ===== DOWNLOAD BUTTON =====
     csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
@@ -365,6 +311,7 @@ if st.session_state.page=="admin":
     if df.empty:
         st.info("No users registered yet.")
     else:
+        
         # ===== TABLE HEADER =====
         h1,h2,h3,h4,h5 = st.columns([5,2,2,2,2])
         h1.markdown("**Email**")
@@ -373,6 +320,7 @@ if st.session_state.page=="admin":
         h4.markdown("**Enable**")
         h5.markdown("**Delete**")
         st.markdown("---")
+        
         # ===== TABLE ROWS =====
         for index,row in df.iterrows():
             col1,col2,col3,col4,col5 = st.columns([5,2,2,2,2])
@@ -414,24 +362,18 @@ if st.session_state.page=="admin":
             st.rerun()
             
 # ================= HOME =================
-
 if st.session_state.page=="home":
-
     apply_background()
-
     col1,col2=st.columns([8,1])
-
     with col1:
         st.title("Weather Data Portal")
-
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
-
     st.write("")
-    
     profile_col1,profile_col2,profile_col3,profile_col4=st.columns([10,0.5,0.5,0.5])
+    
     # ===== ADMIN BUTTON =====
     if st.session_state.get("login_type") == "admin":
         with profile_col2:
@@ -440,6 +382,7 @@ if st.session_state.page=="home":
                 st.session_state.page="admin"
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
+    
     # ===== PROFILE BUTTON =====
     with profile_col3:
         st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
@@ -447,6 +390,7 @@ if st.session_state.page=="home":
             st.session_state.page="profile"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+    
     # ===== LOGOUT BUTTON =====
     with profile_col4:
         st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
@@ -460,32 +404,26 @@ if st.session_state.page=="home":
 
     # ===== centered first row =====
     space1, colA, colB, space2 = st.columns([2,3,3,2])
-
     with colA:
         if st.button("Download IMD Gridded Weather Data\n(Single Location)"):
             st.session_state.mode="download"
             st.session_state.page="dashboard"
             st.session_state.dashboard_title="Single Location Data Download"
             st.rerun()
-
     with colB:
         if st.button("Download IMD Gridded Weather Data\n(Multiple Locations)"):
             st.session_state.mode="download_multi"
             st.session_state.page="dashboard"
             st.session_state.dashboard_title="Multiple Locations Data Download"
             st.rerun()
-
     st.write("")
-
     space3, colC, space4 = st.columns([4,3,3])
-
     with colC:
         if st.button("View IMD Gridded Weather Data"):
             st.session_state.mode="view"
             st.session_state.page="dashboard"
             st.session_state.dashboard_title="Grid Visualisation - IMD Gridded Weather Data"
             st.rerun()
-
 
 # ================= COLOR FUNCTIONS =================
 def rain_color(val):
@@ -495,7 +433,6 @@ def rain_color(val):
     elif val >= 50: return "#6BAED6"
     elif val >= 10: return "#C6DBEF"
     else: return "#F7FBFF"
-
 def temp_color(val):
     if pd.isna(val): return "#ffffff"
     if val >= 40: return "#800026"
@@ -505,10 +442,8 @@ def temp_color(val):
     elif val >= 20: return "#FEB24C"
     else: return "#31A354"
 
-
 # ================= DASHBOARD =================
 if st.session_state.page=="dashboard":
-
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"]{
@@ -516,99 +451,71 @@ if st.session_state.page=="dashboard":
     }
     </style>
     """,unsafe_allow_html=True)
-
     col1,col2=st.columns([8,1])
-
     with col1:
         st.title(st.session_state.dashboard_title)
-
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
-
     GRID_CONFIG={"rain":{"resolution":0.25},"tmax":{"resolution":1.0},"tmin":{"resolution":1.0}}
-
     st.sidebar.header("Filters")
-
     if st.sidebar.button("🏠 Home"):
         st.session_state.page="home"
         st.rerun()
-
     parameter=st.sidebar.selectbox("Select Parameter",["rain","tmax","tmin"])
-
     data_folder=os.path.join("data",parameter)
     parquet_files=glob.glob(os.path.join(data_folder,"*.parquet"))
     years=sorted([os.path.basename(f).split("_")[0] for f in parquet_files])
     
     # ================= VIEW =================
     if st.session_state.mode=="view":
-
         selected_year=st.sidebar.selectbox("Select Year",years)
-
         file=glob.glob(os.path.join("data",parameter,f"{selected_year}*.parquet"))[0]
         df=pd.read_parquet(file)
-
         df["date"]=pd.to_datetime(df["date"])
-
         year_start=pd.to_datetime(f"{selected_year}-01-01")
         year_end=pd.to_datetime(f"{selected_year}-12-31")
-
         selected_date=st.sidebar.date_input(
             "Select Date",
             value=year_start,
             min_value=year_start,
             max_value=year_end
         )
-
         lat_input=st.sidebar.text_input("Latitude")
         lon_input=st.sidebar.text_input("Longitude")
-
         submit_view=st.sidebar.button("Submit")
-
         # store submit state
         if submit_view:
             st.session_state.view_submit=True
             st.session_state.lat_val=float(lat_input)
             st.session_state.lon_val=float(lon_input)
-
         if st.session_state.view_submit:
-
             lat_val=st.session_state.lat_val
             lon_val=st.session_state.lon_val
-
             grid_points=df[["lat","lon"]].drop_duplicates().values
             tree=cKDTree(grid_points)
-
             dist,idx=tree.query([lat_val,lon_val])
             grid_lat,grid_lon=grid_points[idx]
-
             resolution=GRID_CONFIG[parameter]["resolution"]
-
             df_subset=df[
                 (df["lat"].between(grid_lat-resolution,grid_lat+resolution)) &
                 (df["lon"].between(grid_lon-resolution,grid_lon+resolution))
             ]
-
             map_obj=folium.Map(
                 location=[lat_val,lon_val],
                 zoom_start=6,
                 tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                 attr="Esri Satellite"
             )
-
             draw_india_grid(map_obj,df_subset,parameter,selected_date,resolution)
-
             folium.Marker(
                 location=[lat_val,lon_val],
                 popup="Searched Location",
                 icon=folium.Icon(color="yellow",icon="info-sign")
             ).add_to(map_obj)
-
             add_legend(map_obj,parameter)
-
             st_folium(map_obj,height=650,width=1100)
-
         else:
             st.info("Enter latitude and longitude and click Submit to view map.")
             
