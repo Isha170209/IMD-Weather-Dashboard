@@ -187,7 +187,7 @@ if st.session_state.page=="profile":
 
     apply_background()
 
-    col1,col2=st.columns([8,1])
+    col1,col2=st.columns([6,1])
 
     with col1:
         st.title("My Profile")
