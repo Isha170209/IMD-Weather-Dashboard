@@ -176,6 +176,7 @@ if st.session_state.page=="login":
             if login_type:
                 st.session_state.logged_in=True
                 st.session_state.user_email=email
+                st.session_state.login_type=login_type
                 if login_type=="admin":
                     st.session_state.page="admin"
                 else:
@@ -413,10 +414,18 @@ if st.session_state.page=="home":
     st.write("")
 
     # ===== PROFILE BUTTON =====
-    profile_col1,profile_col2,profile_col3=st.columns([10,0.5,0.5])
+    profile_col1,profile_col2,profile_col3,profile_col4=st.columns([10,0.5,0.5,0.5])
 
     st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
 
+    # ===== ADMIN DASHBOARD BUTTON (ONLY FOR ADMIN) =====
+    if st.session_state.get("login_type")=="admin":
+        st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+        with profile_col2:
+            if st.button("🛠", help="Admin Dashboard"):
+                st.session_state.page="admin"
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     with profile_col2:
         if st.button("👤", help="My Profile"):
             st.session_state.page="profile"
