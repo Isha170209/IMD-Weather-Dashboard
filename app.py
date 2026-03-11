@@ -235,7 +235,7 @@ if st.session_state.page=="profile":
             update_password(st.session_state.user_email,new_pass)
             st.success("Password updated successfully")
 
-    if st.button("⬅ Back to Home"):
+    if st.button("🏠", help="Home"):
         st.session_state.page="home"
         st.rerun()
         
