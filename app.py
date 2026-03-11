@@ -32,8 +32,8 @@ ADMIN_PASSWORD = "abc@1234"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-SENDER_EMAIL = st.secrets["rabghdfc@gmail.com"]     # your gmail
-SENDER_PASSWORD =st.secrets["yadkdlldloqllwcn"]    # gmail app password
+SENDER_EMAIL = st.secrets["SENDER_EMAIL"]
+SENDER_PASSWORD = st.secrets["SENDER_PASSWORD"]
 
 # ================= USER DATABASE =================
 USER_DB=os.path.join("data","users.csv")
