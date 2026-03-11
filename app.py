@@ -198,7 +198,7 @@ if st.session_state.page=="profile":
            update_password(st.session_state.user_email,new_pass)
            st.success("Password updated successfully")
     st.markdown('</div>', unsafe_allow_html=True)
-    if st.button("🏠", help="Home"):
+    if st.button("🏠Home", help="Home"):
         st.session_state.page="home"
         st.rerun()
         
@@ -352,7 +352,7 @@ if st.session_state.page=="admin":
                 st.markdown('</div>', unsafe_allow_html=True)
     colA,colB = st.columns(2)
     with colA:
-        if st.button("🏠", help="Home"):
+        if st.button("🏠Home", help="Home"):
             st.session_state.page="home"
             st.rerun()
     with colB:
