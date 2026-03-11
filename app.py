@@ -93,10 +93,10 @@ Weather Data Portal Team
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
         server.quit()
-        print("Email sent successfully")
+        st.success("Email sent successfully!")
     except Exception as e:
-        print("Email error:", e)
-
+        st.error(f"Email sending failed: {e}")
+        
 # ================= SESSION STATE =================
 for key, default in [
     ("page","login"),
