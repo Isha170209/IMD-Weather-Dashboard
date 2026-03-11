@@ -377,7 +377,7 @@ if st.session_state.page=="home":
     st.write("")
 
     # ===== PROFILE BUTTON =====
-    profile_col1,profile_col2,profile_col3=st.columns([11,0.4,0.4])
+    profile_col1,profile_col2,profile_col3=st.columns([10,0.5,0.5])
 
     with profile_col2:
         if st.button("👤"):
@@ -385,7 +385,7 @@ if st.session_state.page=="home":
             st.rerun()
 
     with profile_col3:
-        if st.button("Logout"):
+        if st.button("⏻"):
             st.session_state.logged_in=False
             st.session_state.page="login"
             st.rerun()
