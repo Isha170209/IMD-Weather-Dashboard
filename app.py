@@ -381,7 +381,7 @@ if st.session_state.page=="admin":
             # Enable button
             with col4:
                 st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-                if st.button("🟢", key=f"disable{index}", help="Enable User"):
+                if st.button("🟢", key=f"enable{index}", help="Enable User"):
                     df.loc[index,"status"]="enabled"
                     df.to_csv(USER_DB,index=False)
                     st.rerun()
