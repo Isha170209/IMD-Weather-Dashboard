@@ -9,6 +9,9 @@ import folium
 from streamlit_folium import st_folium
 import base64
 import hashlib
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 st.set_page_config(layout="wide")
 
@@ -24,6 +27,13 @@ img {
 # ================= ADMIN CONFIG =================
 ADMIN_EMAIL = "ishku1022@gmail.com"
 ADMIN_PASSWORD = "abc@1234"
+
+# ================= EMAIL CONFIG =================
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+
+SENDER_EMAIL = "yourgmail@gmail.com"     # your gmail
+SENDER_PASSWORD = "your_app_password"    # gmail app password
 
 # ================= USER DATABASE =================
 USER_DB=os.path.join("data","users.csv")
