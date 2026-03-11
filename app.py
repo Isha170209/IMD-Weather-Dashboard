@@ -79,7 +79,9 @@ You have successfully registered on the Weather Data Portal.
 You can now login using:
 Email : {receiver_email}
 Use the password you created during registration.
-Regards
+
+
+Regards,
 Weather Data Portal Team
 """
     try:
