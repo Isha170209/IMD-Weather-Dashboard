@@ -195,19 +195,21 @@ if st.session_state.page=="login":
             else:
                 st.error("Invalid email or password")
         st.markdown('</div>', unsafe_allow_html=True)
-        
+
     # ---------- REGISTER TAB ----------
-    if st.button("Register", help="Create Account"):
-    df=load_users()
-    if new_email in df["email"].values:
-        st.warning("User already exists")
-    else:
-        save_user(new_email,new_pass)
-
-        # send registration email
-        send_registration_email(new_email)
-
-        st.success("Registration successful. Confirmation email sent.")
+    with tab2:
+        new_email = st.text_input("Register Email")
+        new_pass = st.text_input("Create Password", type="password")
+        if st.button("Register", help="Create Account"):
+            df = load_users()
+            if new_email in df["email"].values:
+                st.warning("User already exists")
+            else:
+                save_user(new_email, new_pass)
+                # send registration email
+                send_registration_email(new_email)
+                st.success("Registration successful. Confirmation email sent.")
+   
 # ================= PROFILE PAGE =================
 if st.session_state.page=="profile":
     apply_background()
