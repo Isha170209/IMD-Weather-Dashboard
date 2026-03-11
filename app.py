@@ -341,32 +341,35 @@ def draw_india_grid(map_obj, df, parameter, selected_date, resolution):
         style_function=lambda x:x["properties"]["style"],
         popup=folium.GeoJsonPopup(fields=["Grid"])
     ).add_to(map_obj)
-
+    
 # ================= ADMIN DASHBOARD =================
 if st.session_state.page=="admin":
-
     apply_background()
-
     col1,col2=st.columns([8,1])
-
     with col1:
         st.title("Admin Dashboard")
-
     with col2:
         logo_path=os.path.join("data","logo.png")
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
-
     st.write("### Registered Users")
     df = load_users()
     if df.empty:
-       st.info("No users registered yet.")
+        st.info("No users registered yet.")
     else:
+        # ===== TABLE HEADER =====
+        h1,h2,h3,h4 = st.columns([5,2,2,2])
+        h1.markdown("**Email**")
+        h2.markdown("**Status**")
+        h3.markdown("**Disable**")
+        h4.markdown("**Delete**")
+        st.markdown("---")
+        # ===== TABLE ROWS =====
         for index,row in df.iterrows():
-            col1,col2,col3,col4=st.columns([5,2,2,2])
+            col1,col2,col3,col4 = st.columns([5,2,2,2])
             col1.write(row["email"])
             col2.write(row["status"])
-         # Disable button without box
+            # Disable button
             with col3:
                 st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
                 if st.button("🚫", key=f"disable{index}", help="Disable User"):
@@ -374,7 +377,7 @@ if st.session_state.page=="admin":
                     df.to_csv(USER_DB,index=False)
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
-         # Delete button without box
+            # Delete button
             with col4:
                 st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
                 if st.button("🗑", key=f"delete{index}", help="Delete User"):
@@ -383,7 +386,6 @@ if st.session_state.page=="admin":
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
     colA,colB = st.columns(2)
-
     with colA:
         if st.button("🏠", help="Home"):
             st.session_state.page="home"
@@ -393,8 +395,7 @@ if st.session_state.page=="admin":
             st.session_state.logged_in=False
             st.session_state.page="login"
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    
+            
 # ================= HOME =================
 
 if st.session_state.page=="home":
