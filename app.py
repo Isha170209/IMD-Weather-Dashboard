@@ -28,16 +28,21 @@ ADMIN_PASSWORD = "abc@1234"
 # ================= USER DATABASE =================
 USER_DB=os.path.join("data","users.csv")
 if not os.path.exists(USER_DB):
-    pd.DataFrame(columns=["email","password"]).to_csv(USER_DB,index=False)
+    pd.DataFrame(columns=["email","password","status"]).to_csv(USER_DB,index=False)
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def load_users():
     if os.path.exists(USER_DB):
-        return pd.read_csv(USER_DB)
+        df = pd.read_csv(USER_DB)
+        # If old CSV without status column → add it
+        if "status" not in df.columns:
+            df["status"] = "active"
+            df.to_csv(USER_DB, index=False)
+        return df
     else:
-        return pd.DataFrame(columns=["email","password"])
+        return pd.DataFrame(columns=["email","password","status"])
 
 def save_user(email,password):
     df=load_users()
