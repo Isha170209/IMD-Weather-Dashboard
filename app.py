@@ -412,35 +412,31 @@ if st.session_state.page=="home":
             st.image(logo_path,width=100)
 
     st.write("")
-
-    # ===== PROFILE BUTTON =====
+    
     profile_col1,profile_col2,profile_col3,profile_col4=st.columns([10,0.5,0.5,0.5])
-
-    st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-
-    # ===== ADMIN DASHBOARD BUTTON (ONLY FOR ADMIN) =====
-    if st.session_state.get("login_type")=="admin":
-        st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+    # ===== ADMIN BUTTON =====
+    if st.session_state.get("login_type") == "admin":
         with profile_col2:
+            st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
             if st.button("🛠", help="Admin Dashboard"):
                 st.session_state.page="admin"
                 st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    with profile_col3:
-        if st.button("👤", help="My Profile"):
-            st.session_state.page="profile"
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-
-    with profile_col4:
-        if st.button("⏻", help="Logout"):
-            st.session_state.logged_in=False
-            st.session_state.page="login"
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
+            st.markdown('</div>', unsafe_allow_html=True)
+   # ===== PROFILE BUTTON =====
+   with profile_col3:
+       st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+       if st.button("👤", help="My Profile"):
+           st.session_state.page="profile"
+           st.rerun()
+       st.markdown('</div>', unsafe_allow_html=True)
+   # ===== LOGOUT BUTTON =====
+   with profile_col4:
+       st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+       if st.button("⏻", help="Logout"):
+           st.session_state.logged_in=False
+           st.session_state.page="login"
+           st.rerun()
+       st.markdown('</div>', unsafe_allow_html=True)
     st.write("")
     st.write("")
 
