@@ -366,15 +366,16 @@ if st.session_state.page=="admin":
     colA,colB = st.columns(2)
 
     with colA:
-        if st.button("⬅ Go to Home"):
+        if st.button("🏠 Home"):
             st.session_state.page="home"
             st.rerun()
 
     with colB:
-        if st.button("Logout"):
+        if st.button("⏻", help="Logout"):
             st.session_state.logged_in=False
             st.session_state.page="login"
             st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 # ================= HOME =================
 
 if st.session_state.page=="home":
