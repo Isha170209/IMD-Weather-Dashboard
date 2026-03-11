@@ -355,31 +355,31 @@ if st.session_state.page=="admin":
         if os.path.exists(logo_path):
             st.image(logo_path,width=100)
 
-   st.write("### Registered Users")
-   df = load_users()
-   if df.empty:
-      st.info("No users registered yet.")
-   else:
-       for index,row in df.iterrows():
-           col1,col2,col3,col4=st.columns([5,2,2,2])
-           col1.write(row["email"])
-           col2.write(row["status"])
-        # Disable button without box
-           with col3:
-               st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-               if st.button("🚫 Disable", key=f"disable{index}", help="Disable User"):
-                   df.loc[index,"status"]="disabled"
-                   df.to_csv(USER_DB,index=False)
-                   st.rerun()
-               st.markdown('</div>', unsafe_allow_html=True)
-        # Delete button without box
-           with col4:
-               st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-               if st.button("🗑 Delete", key=f"delete{index}", help="Delete User"):
-                   df=df.drop(index)
-                   df.to_csv(USER_DB,index=False)
-                   st.rerun()
-               st.markdown('</div>', unsafe_allow_html=True)
+    st.write("### Registered Users")
+    df = load_users()
+    if df.empty:
+       st.info("No users registered yet.")
+    else:
+        for index,row in df.iterrows():
+            col1,col2,col3,col4=st.columns([5,2,2,2])
+            col1.write(row["email"])
+            col2.write(row["status"])
+         # Disable button without box
+            with col3:
+                st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+                if st.button("🚫 Disable", key=f"disable{index}", help="Disable User"):
+                    df.loc[index,"status"]="disabled"
+                    df.to_csv(USER_DB,index=False)
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+         # Delete button without box
+            with col4:
+                st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+                if st.button("🗑 Delete", key=f"delete{index}", help="Delete User"):
+                    df=df.drop(index)
+                    df.to_csv(USER_DB,index=False)
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
     colA,colB = st.columns(2)
 
     with colA:
