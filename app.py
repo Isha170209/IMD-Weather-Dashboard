@@ -366,9 +366,9 @@ if st.session_state.page=="admin":
     colA,colB = st.columns(2)
 
     with colA:
-        if st.button("🏠 Home"):
-            st.session_state.page="home"
-            st.rerun()
+    if st.button("🏠", help="Home"):
+        st.session_state.page="home"
+        st.rerun()
 
     with colB:
         if st.button("⏻", help="Logout"):
