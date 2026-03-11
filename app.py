@@ -367,7 +367,7 @@ if st.session_state.page=="admin":
          # Disable button without box
             with col3:
                 st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-                if st.button("🚫 Disable", key=f"disable{index}", help="Disable User"):
+                if st.button("🚫", key=f"disable{index}", help="Disable User"):
                     df.loc[index,"status"]="disabled"
                     df.to_csv(USER_DB,index=False)
                     st.rerun()
@@ -375,7 +375,7 @@ if st.session_state.page=="admin":
          # Delete button without box
             with col4:
                 st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-                if st.button("🗑 Delete", key=f"delete{index}", help="Delete User"):
+                if st.button("🗑", key=f"delete{index}", help="Delete User"):
                     df=df.drop(index)
                     df.to_csv(USER_DB,index=False)
                     st.rerun()
