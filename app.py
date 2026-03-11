@@ -422,21 +422,21 @@ if st.session_state.page=="home":
                 st.session_state.page="admin"
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-   # ===== PROFILE BUTTON =====
-   with profile_col3:
-       st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-       if st.button("👤", help="My Profile"):
-           st.session_state.page="profile"
-           st.rerun()
-       st.markdown('</div>', unsafe_allow_html=True)
-   # ===== LOGOUT BUTTON =====
-   with profile_col4:
-       st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
-       if st.button("⏻", help="Logout"):
-           st.session_state.logged_in=False
-           st.session_state.page="login"
-           st.rerun()
-       st.markdown('</div>', unsafe_allow_html=True)
+    # ===== PROFILE BUTTON =====
+    with profile_col3:
+        st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+        if st.button("👤", help="My Profile"):
+            st.session_state.page="profile"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    # ===== LOGOUT BUTTON =====
+    with profile_col4:
+        st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
+        if st.button("⏻", help="Logout"):
+            st.session_state.logged_in=False
+            st.session_state.page="login"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     st.write("")
     st.write("")
 
