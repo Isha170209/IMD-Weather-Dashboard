@@ -62,8 +62,12 @@ def authenticate(email,password):
         return "admin"
     df=load_users()
     hashed=hash_password(password)
-    if ((df["email"]==email)&(df["password"]==hashed)).any():
-        return "user"
+    row = df[(df["email"]==email) & (df["password"]==hashed)]
+    if not row.empty:
+        if row.iloc[0]["status"] == "disabled":
+            return "disabled"
+        else:
+            return "user"        
     return None
 def update_password(email,new_password):
     df=load_users()
