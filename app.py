@@ -426,7 +426,7 @@ if st.session_state.page=="home":
                 st.session_state.page="admin"
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    with profile_col2:
+    with profile_col3:
         if st.button("👤", help="My Profile"):
             st.session_state.page="profile"
             st.rerun()
@@ -434,7 +434,7 @@ if st.session_state.page=="home":
 
     st.markdown('<div class="icon-btn">', unsafe_allow_html=True)
 
-    with profile_col3:
+    with profile_col4:
         if st.button("⏻", help="Logout"):
             st.session_state.logged_in=False
             st.session_state.page="login"
