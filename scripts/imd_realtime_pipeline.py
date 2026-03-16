@@ -5,18 +5,25 @@ import datetime
 import os
 import pyarrow.parquet as pq
 import pyarrow as pa
+from bs4 import BeautifulSoup
 
 # ============================
 # CONFIG
 # ============================
 
-BASE_URL = "https://www.imdpune.gov.in/Clim_Pred_LRF_New/Grided_Data_Download"
+PAGES = {
+    "tmax": "https://www.imdpune.gov.in/cmpg/Realtimedata/maxone/maxone.php",
+    "tmin": "https://www.imdpune.gov.in/cmpg/Realtimedata/minone/minone.php",
+    "rainfall": "https://www.imdpune.gov.in/cmpg/Realtimedata/Rainfall/rain.php"
+}
 
 OUTPUT_DIR = "data/realtime"
 TEMP_DIR = "temp"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+headers = {"User-Agent": "Mozilla/5.0"}
 
 print("Directories verified")
 
@@ -26,21 +33,11 @@ print("Directories verified")
 
 yesterday = datetime.date.today() - datetime.timedelta(days=1)
 
-date_temp = yesterday.strftime("%d%m%Y")   # for tmax/tmin
-date_rain = yesterday.strftime("%y_%m_%d") # for rainfall
+date_temp = yesterday.strftime("%d%m%Y")
+date_rain = yesterday.strftime("%y_%m_%d")
 date_file = yesterday.strftime("%Y%m%d")
 
 print(f"Processing data for date: {yesterday}")
-
-# ============================
-# FILE LINKS (UPDATED)
-# ============================
-
-files = {
-    "rainfall": f"{BASE_URL}/rain_ind0.25_{date_rain}.grd",
-    "tmax": f"{BASE_URL}/max1_{date_temp}.grd",
-    "tmin": f"{BASE_URL}/min1_{date_temp}.grd"
-}
 
 # ============================
 # GRID SPECS
@@ -53,6 +50,42 @@ grids = {
 }
 
 # ============================
+# FUNCTION: FIND GRD LINK
+# ============================
+
+def find_grd_link(page_url, keyword):
+
+    print(f"Opening page: {page_url}")
+
+    r = requests.get(page_url, headers=headers)
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    for link in soup.find_all("a"):
+
+        href = link.get("href")
+
+        if href and keyword in href and ".grd" in href:
+
+            if href.startswith("http"):
+                return href
+            else:
+                base = page_url.rsplit("/",1)[0]
+                return base + "/" + href
+
+    return None
+
+# ============================
+# FILE DISCOVERY
+# ============================
+
+files = {
+    "tmax": find_grd_link(PAGES["tmax"], date_temp),
+    "tmin": find_grd_link(PAGES["tmin"], date_temp),
+    "rainfall": find_grd_link(PAGES["rainfall"], date_rain)
+}
+
+# ============================
 # PROCESS LOOP
 # ============================
 
@@ -60,34 +93,31 @@ for param, url in files.items():
 
     print("\n-----------------------------------")
     print(f"Processing parameter: {param}")
+
+    if url is None:
+        print("GRD file not found on page")
+        continue
+
     print(f"Download URL: {url}")
 
     grd_path = f"{TEMP_DIR}/{param}.grd"
 
     try:
 
-        # ============================
-        # DOWNLOAD GRD
-        # ============================
-
         print(f"Attempting download for {param}")
 
-        r = requests.get(url)
+        r = requests.get(url, headers=headers, timeout=60)
 
         print(f"Download status code: {r.status_code}")
 
         if r.status_code != 200:
-            print(f"{param}.grd not available on server")
+            print(f"{param}.grd download failed")
             continue
 
         with open(grd_path, "wb") as f:
             f.write(r.content)
 
-        if os.path.exists(grd_path):
-            print(f"{param}.grd downloaded successfully")
-        else:
-            print(f"Failed to save {param}.grd")
-            continue
+        print(f"{param}.grd downloaded successfully")
 
         # ============================
         # READ BINARY
@@ -95,7 +125,7 @@ for param, url in files.items():
 
         rows, cols = grids[param]
 
-        print(f"Reading binary file for {param}")
+        print("Reading binary file")
 
         data = np.fromfile(grd_path, dtype=np.float32)
 
@@ -103,11 +133,9 @@ for param, url in files.items():
 
         data = data.reshape(rows, cols)
 
-        print(f"Data reshaped to grid: {rows} x {cols}")
-
         df = pd.DataFrame(data)
 
-        print(f"DataFrame created with shape: {df.shape}")
+        print("DataFrame created")
 
         # ============================
         # CSV TEMP
@@ -117,11 +145,7 @@ for param, url in files.items():
 
         df.to_csv(csv_path, index=False)
 
-        if os.path.exists(csv_path):
-            print(f"{param}.csv created successfully")
-        else:
-            print(f"CSV creation failed for {param}")
-            continue
+        print(f"{param}.csv created")
 
         # ============================
         # XLSB TEMP
@@ -131,17 +155,11 @@ for param, url in files.items():
 
         df.to_excel(xlsb_path, index=False)
 
-        if os.path.exists(xlsb_path):
-            print(f"{param}.xlsb created successfully")
-        else:
-            print(f"XLSB creation failed for {param}")
-            continue
+        print(f"{param}.xlsb created")
 
         # ============================
         # PARQUET FINAL
         # ============================
-
-        print(f"Converting {param} to parquet")
 
         table = pa.Table.from_pandas(df)
 
@@ -149,27 +167,22 @@ for param, url in files.items():
 
         pq.write_table(table, parquet_path)
 
-        if os.path.exists(parquet_path):
-            print(f"{param}.parquet created successfully")
-        else:
-            print(f"Parquet conversion failed for {param}")
-            continue
+        print(f"{param}.parquet created")
 
         # ============================
         # DELETE TEMP FILES
         # ============================
 
-        print(f"Removing temporary files for {param}")
-
         os.remove(grd_path)
         os.remove(csv_path)
         os.remove(xlsb_path)
 
-        print(f"Temporary files deleted for {param}")
+        print("Temporary files removed")
 
     except Exception as e:
-        print(f"Error occurred while processing {param}")
-        print(str(e))
+
+        print("Error occurred while processing")
+        print(e)
 
 print("\n-----------------------------------")
 print("Processing Complete")
