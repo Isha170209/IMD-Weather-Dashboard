@@ -12,3 +12,4 @@ streamlit-folium
 folium
 xarray
 openpyxl
+beautifulsoup4
