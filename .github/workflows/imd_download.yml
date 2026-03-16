@@ -27,7 +27,7 @@ jobs:
 
     - name: Run Script
       run: |
-        python scripts/process_imd_grd.py
+        python scripts/imd_realtime_pipeline.py
 
     - name: Commit Parquet Files
       run: |
