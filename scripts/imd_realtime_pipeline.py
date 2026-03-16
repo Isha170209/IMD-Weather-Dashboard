@@ -26,19 +26,20 @@ print("Directories verified")
 
 yesterday = datetime.date.today() - datetime.timedelta(days=1)
 
-date_str = yesterday.strftime("%d%m%Y")
+date_temp = yesterday.strftime("%d%m%Y")   # for tmax/tmin
+date_rain = yesterday.strftime("%y_%m_%d") # for rainfall
 date_file = yesterday.strftime("%Y%m%d")
 
 print(f"Processing data for date: {yesterday}")
 
 # ============================
-# FILE LINKS
+# FILE LINKS (UPDATED)
 # ============================
 
 files = {
-    "rainfall": f"{BASE_URL}/rf_{date_str}.grd",
-    "tmax": f"{BASE_URL}/tmax_{date_str}.grd",
-    "tmin": f"{BASE_URL}/tmin_{date_str}.grd"
+    "rainfall": f"{BASE_URL}/rain_ind0.25_{date_rain}.grd",
+    "tmax": f"{BASE_URL}/max1_{date_temp}.grd",
+    "tmin": f"{BASE_URL}/min1_{date_temp}.grd"
 }
 
 # ============================
