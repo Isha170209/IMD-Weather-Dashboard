@@ -12,7 +12,7 @@ import pyarrow as pa
 
 BASE_URL = "https://www.imdpune.gov.in/Clim_Pred_LRF_New/Grided_Data_Download"
 
-OUTPUT_DIR = "data/parquet"
+OUTPUT_DIR = "data/realtime"
 TEMP_DIR = "temp"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
