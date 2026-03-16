@@ -18,6 +18,8 @@ TEMP_DIR = "temp"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+print("Directories verified")
+
 # ============================
 # YESTERDAY DATE
 # ============================
@@ -26,6 +28,8 @@ yesterday = datetime.date.today() - datetime.timedelta(days=1)
 
 date_str = yesterday.strftime("%d%m%Y")
 date_file = yesterday.strftime("%Y%m%d")
+
+print(f"Processing data for date: {yesterday}")
 
 # ============================
 # FILE LINKS
@@ -53,63 +57,118 @@ grids = {
 
 for param, url in files.items():
 
-    print(f"Downloading {param}")
+    print("\n-----------------------------------")
+    print(f"Processing parameter: {param}")
+    print(f"Download URL: {url}")
 
     grd_path = f"{TEMP_DIR}/{param}.grd"
 
-    r = requests.get(url)
+    try:
 
-    if r.status_code != 200:
-        print(f"{param} not available")
-        continue
+        # ============================
+        # DOWNLOAD GRD
+        # ============================
 
-    with open(grd_path, "wb") as f:
-        f.write(r.content)
+        print(f"Attempting download for {param}")
 
-    # ============================
-    # READ BINARY
-    # ============================
+        r = requests.get(url)
 
-    rows, cols = grids[param]
+        print(f"Download status code: {r.status_code}")
 
-    data = np.fromfile(grd_path, dtype=np.float32)
+        if r.status_code != 200:
+            print(f"{param}.grd not available on server")
+            continue
 
-    data = data.reshape(rows, cols)
+        with open(grd_path, "wb") as f:
+            f.write(r.content)
 
-    df = pd.DataFrame(data)
+        if os.path.exists(grd_path):
+            print(f"{param}.grd downloaded successfully")
+        else:
+            print(f"Failed to save {param}.grd")
+            continue
 
-    # ============================
-    # CSV TEMP
-    # ============================
+        # ============================
+        # READ BINARY
+        # ============================
 
-    csv_path = f"{TEMP_DIR}/{param}.csv"
+        rows, cols = grids[param]
 
-    df.to_csv(csv_path, index=False)
+        print(f"Reading binary file for {param}")
 
-    # ============================
-    # XLSB TEMP
-    # ============================
+        data = np.fromfile(grd_path, dtype=np.float32)
 
-    xlsb_path = f"{TEMP_DIR}/{param}.xlsb"
+        print(f"Binary values read: {len(data)}")
 
-    df.to_excel(xlsb_path, index=False)
+        data = data.reshape(rows, cols)
 
-    # ============================
-    # PARQUET FINAL
-    # ============================
+        print(f"Data reshaped to grid: {rows} x {cols}")
 
-    table = pa.Table.from_pandas(df)
+        df = pd.DataFrame(data)
 
-    parquet_path = f"{OUTPUT_DIR}/{param}_{date_file}.parquet"
+        print(f"DataFrame created with shape: {df.shape}")
 
-    pq.write_table(table, parquet_path)
+        # ============================
+        # CSV TEMP
+        # ============================
 
-    # ============================
-    # DELETE TEMP FILES
-    # ============================
+        csv_path = f"{TEMP_DIR}/{param}.csv"
 
-    os.remove(grd_path)
-    os.remove(csv_path)
-    os.remove(xlsb_path)
+        df.to_csv(csv_path, index=False)
 
+        if os.path.exists(csv_path):
+            print(f"{param}.csv created successfully")
+        else:
+            print(f"CSV creation failed for {param}")
+            continue
+
+        # ============================
+        # XLSB TEMP
+        # ============================
+
+        xlsb_path = f"{TEMP_DIR}/{param}.xlsb"
+
+        df.to_excel(xlsb_path, index=False)
+
+        if os.path.exists(xlsb_path):
+            print(f"{param}.xlsb created successfully")
+        else:
+            print(f"XLSB creation failed for {param}")
+            continue
+
+        # ============================
+        # PARQUET FINAL
+        # ============================
+
+        print(f"Converting {param} to parquet")
+
+        table = pa.Table.from_pandas(df)
+
+        parquet_path = f"{OUTPUT_DIR}/{param}_{date_file}.parquet"
+
+        pq.write_table(table, parquet_path)
+
+        if os.path.exists(parquet_path):
+            print(f"{param}.parquet created successfully")
+        else:
+            print(f"Parquet conversion failed for {param}")
+            continue
+
+        # ============================
+        # DELETE TEMP FILES
+        # ============================
+
+        print(f"Removing temporary files for {param}")
+
+        os.remove(grd_path)
+        os.remove(csv_path)
+        os.remove(xlsb_path)
+
+        print(f"Temporary files deleted for {param}")
+
+    except Exception as e:
+        print(f"Error occurred while processing {param}")
+        print(str(e))
+
+print("\n-----------------------------------")
 print("Processing Complete")
