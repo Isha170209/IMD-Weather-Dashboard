@@ -1,15 +1,61 @@
-import requests
-import pandas as pd
-import numpy as np
-import datetime
 import os
-import pyarrow.parquet as pq
-import pyarrow as pa
+import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+import time
 
-# ============================
-# CONFIG
-# ============================
+# ================= CONFIG =================
+
+BASE_DIR = "data/realtime"
+RAW_DIR = os.path.join(BASE_DIR, "raw")
+
+os.makedirs(RAW_DIR, exist_ok=True)
+
+print("Directories verified")
+
+# ================= DATE =================
+
+today = datetime.utcnow() - timedelta(days=1)
+
+date_temp = today.strftime("%d%m%Y")      # for tmax/tmin
+date_rain = today.strftime("%y_%m_%d")    # for rainfall
+
+print(f"Processing data for date: {today.strftime('%Y-%m-%d')}")
+
+# ================= HEADERS =================
+
+headers = {
+    "User-Agent": "Mozilla/5.0"
+}
+
+# ================= SAFE REQUEST =================
+
+def safe_request(url, retries=5):
+
+    for attempt in range(retries):
+        try:
+            print(f"Attempt {attempt+1} → {url}")
+
+            r = requests.get(
+                url,
+                headers=headers,
+                timeout=60
+            )
+
+            if r.status_code == 200:
+                return r
+
+            print(f"Status code: {r.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error: {e}")
+
+        time.sleep(15)
+
+    return None
+
+
+# ================= PAGE URLS =================
 
 PAGES = {
     "tmax": "https://www.imdpune.gov.in/cmpg/Realtimedata/maxone/maxone.php",
@@ -17,47 +63,17 @@ PAGES = {
     "rainfall": "https://www.imdpune.gov.in/cmpg/Realtimedata/Rainfall/rain.php"
 }
 
-OUTPUT_DIR = "data/realtime"
-TEMP_DIR = "temp"
-
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(TEMP_DIR, exist_ok=True)
-
-headers = {"User-Agent": "Mozilla/5.0"}
-
-print("Directories verified")
-
-# ============================
-# YESTERDAY DATE
-# ============================
-
-yesterday = datetime.date.today() - datetime.timedelta(days=1)
-
-date_temp = yesterday.strftime("%d%m%Y")
-date_rain = yesterday.strftime("%y_%m_%d")
-date_file = yesterday.strftime("%Y%m%d")
-
-print(f"Processing data for date: {yesterday}")
-
-# ============================
-# GRID SPECS
-# ============================
-
-grids = {
-    "rainfall": (135, 129),
-    "tmax": (31, 31),
-    "tmin": (31, 31)
-}
-
-# ============================
-# FUNCTION: FIND GRD LINK
-# ============================
+# ================= FIND FILE =================
 
 def find_grd_link(page_url, keyword):
 
-    print(f"Opening page: {page_url}")
+    print(f"\nOpening page: {page_url}")
 
-    r = requests.get(page_url, headers=headers)
+    r = safe_request(page_url)
+
+    if r is None:
+        print(f"Skipping page (failed): {page_url}")
+        return None
 
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -70,119 +86,63 @@ def find_grd_link(page_url, keyword):
             if href.startswith("http"):
                 return href
             else:
-                base = page_url.rsplit("/",1)[0]
+                base = page_url.rsplit("/", 1)[0]
                 return base + "/" + href
 
     return None
 
-# ============================
-# FILE DISCOVERY
-# ============================
 
-files = {
-    "tmax": find_grd_link(PAGES["tmax"], date_temp),
-    "tmin": find_grd_link(PAGES["tmin"], date_temp),
-    "rainfall": find_grd_link(PAGES["rainfall"], date_rain)
-}
+# ================= DOWNLOAD FILE =================
 
-# ============================
-# PROCESS LOOP
-# ============================
-
-for param, url in files.items():
-
-    print("\n-----------------------------------")
-    print(f"Processing parameter: {param}")
+def download_file(url, param):
 
     if url is None:
-        print("GRD file not found on page")
-        continue
+        print(f"{param} → No file found")
+        return
 
-    print(f"Download URL: {url}")
+    print(f"\nDownloading {param}: {url}")
 
-    grd_path = f"{TEMP_DIR}/{param}.grd"
+    r = safe_request(url)
 
+    if r is None:
+        print(f"{param} → Download failed")
+        return
+
+    file_path = os.path.join(RAW_DIR, f"{param}.grd")
+
+    with open(file_path, "wb") as f:
+        f.write(r.content)
+
+    print(f"{param} saved → {file_path}")
+
+
+# ================= MAIN =================
+
+files = {}
+
+for param in PAGES:
     try:
+        if param == "rainfall":
+            key = date_rain
+        else:
+            key = date_temp
 
-        print(f"Attempting download for {param}")
+        files[param] = find_grd_link(PAGES[param], key)
 
-        r = requests.get(url, headers=headers, timeout=60)
-
-        print(f"Download status code: {r.status_code}")
-
-        if r.status_code != 200:
-            print(f"{param}.grd download failed")
-            continue
-
-        with open(grd_path, "wb") as f:
-            f.write(r.content)
-
-        print(f"{param}.grd downloaded successfully")
-
-        # ============================
-        # READ BINARY
-        # ============================
-
-        rows, cols = grids[param]
-
-        print("Reading binary file")
-
-        data = np.fromfile(grd_path, dtype=np.float32)
-
-        print(f"Binary values read: {len(data)}")
-
-        data = data.reshape(rows, cols)
-
-        df = pd.DataFrame(data)
-
-        print("DataFrame created")
-
-        # ============================
-        # CSV TEMP
-        # ============================
-
-        csv_path = f"{TEMP_DIR}/{param}.csv"
-
-        df.to_csv(csv_path, index=False)
-
-        print(f"{param}.csv created")
-
-        # ============================
-        # XLSB TEMP
-        # ============================
-
-        xlsb_path = f"{TEMP_DIR}/{param}.xlsb"
-
-        df.to_excel(xlsb_path, index=False)
-
-        print(f"{param}.xlsb created")
-
-        # ============================
-        # PARQUET FINAL
-        # ============================
-
-        table = pa.Table.from_pandas(df)
-
-        parquet_path = f"{OUTPUT_DIR}/{param}_{date_file}.parquet"
-
-        pq.write_table(table, parquet_path)
-
-        print(f"{param}.parquet created")
-
-        # ============================
-        # DELETE TEMP FILES
-        # ============================
-
-        os.remove(grd_path)
-        os.remove(csv_path)
-        os.remove(xlsb_path)
-
-        print("Temporary files removed")
+        print(f"{param} file → {files[param]}")
 
     except Exception as e:
+        print(f"Error processing {param}: {e}")
+        files[param] = None
 
-        print("Error occurred while processing")
-        print(e)
 
-print("\n-----------------------------------")
-print("Processing Complete")
+# ================= DOWNLOAD ALL =================
+
+for param, url in files.items():
+    try:
+        download_file(url, param)
+    except Exception as e:
+        print(f"Download failed for {param}: {e}")
+
+
+print("\nProcessing Complete")
