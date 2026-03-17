@@ -1,6 +1,5 @@
 import os
 import requests
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import time
 
@@ -17,132 +16,61 @@ print("Directories verified")
 
 today = datetime.utcnow() - timedelta(days=1)
 
-date_temp = today.strftime("%d%m%Y")      # for tmax/tmin
-date_rain = today.strftime("%y_%m_%d")    # for rainfall
+date_temp = today.strftime("%d%m%Y")
+date_rain = today.strftime("%y_%m_%d")
 
 print(f"Processing data for date: {today.strftime('%Y-%m-%d')}")
 
-# ================= HEADERS =================
+# ================= FILE URLS =================
 
-headers = {
-    "User-Agent": "Mozilla/5.0"
+BASE_URL = "https://www.imdpune.gov.in/Clim_Pred_LRF_New/Grided_Data_Download"
+
+URLS = {
+    "tmax": f"{BASE_URL}/max1_{date_temp}.grd",
+    "tmin": f"{BASE_URL}/min1_{date_temp}.grd",
+    "rainfall": f"{BASE_URL}/rain_ind0.25_{date_rain}.grd"
 }
 
-# ================= SAFE REQUEST =================
+# ================= SAFE DOWNLOAD =================
 
-def safe_request(url, retries=5):
+def download_file(param, url, retries=5):
 
     for attempt in range(retries):
+
         try:
-            print(f"Attempt {attempt+1} → {url}")
+            print(f"\n{param} → Attempt {attempt+1}")
+            print(f"URL: {url}")
 
             r = requests.get(
                 url,
-                headers=headers,
+                headers={"User-Agent": "Mozilla/5.0"},
                 timeout=60
             )
 
             if r.status_code == 200:
-                return r
 
-            print(f"Status code: {r.status_code}")
+                file_path = os.path.join(RAW_DIR, f"{param}.grd")
+
+                with open(file_path, "wb") as f:
+                    f.write(r.content)
+
+                print(f"{param} saved → {file_path}")
+                return
+
+            else:
+                print(f"{param} not available (status {r.status_code})")
 
         except requests.exceptions.RequestException as e:
-            print(f"Error: {e}")
+            print(f"{param} error: {e}")
 
         time.sleep(15)
 
-    return None
+    print(f"{param} → Failed after retries")
 
 
-# ================= PAGE URLS =================
+# ================= RUN =================
 
-PAGES = {
-    "tmax": "https://www.imdpune.gov.in/cmpg/Realtimedata/maxone/maxone.php",
-    "tmin": "https://www.imdpune.gov.in/cmpg/Realtimedata/minone/minone.php",
-    "rainfall": "https://www.imdpune.gov.in/cmpg/Realtimedata/Rainfall/rain.php"
-}
-
-# ================= FIND FILE =================
-
-def find_grd_link(page_url, keyword):
-
-    print(f"\nOpening page: {page_url}")
-
-    r = safe_request(page_url)
-
-    if r is None:
-        print(f"Skipping page (failed): {page_url}")
-        return None
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    for link in soup.find_all("a"):
-
-        href = link.get("href")
-
-        if href and keyword in href and ".grd" in href:
-
-            if href.startswith("http"):
-                return href
-            else:
-                base = page_url.rsplit("/", 1)[0]
-                return base + "/" + href
-
-    return None
-
-
-# ================= DOWNLOAD FILE =================
-
-def download_file(url, param):
-
-    if url is None:
-        print(f"{param} → No file found")
-        return
-
-    print(f"\nDownloading {param}: {url}")
-
-    r = safe_request(url)
-
-    if r is None:
-        print(f"{param} → Download failed")
-        return
-
-    file_path = os.path.join(RAW_DIR, f"{param}.grd")
-
-    with open(file_path, "wb") as f:
-        f.write(r.content)
-
-    print(f"{param} saved → {file_path}")
-
-
-# ================= MAIN =================
-
-files = {}
-
-for param in PAGES:
-    try:
-        if param == "rainfall":
-            key = date_rain
-        else:
-            key = date_temp
-
-        files[param] = find_grd_link(PAGES[param], key)
-
-        print(f"{param} file → {files[param]}")
-
-    except Exception as e:
-        print(f"Error processing {param}: {e}")
-        files[param] = None
-
-
-# ================= DOWNLOAD ALL =================
-
-for param, url in files.items():
-    try:
-        download_file(url, param)
-    except Exception as e:
-        print(f"Download failed for {param}: {e}")
-
+for param, url in URLS.items():
+    download_file(param, url)
 
 print("\nProcessing Complete")
