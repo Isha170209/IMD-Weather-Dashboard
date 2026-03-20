@@ -1,10 +1,12 @@
 import os
 import sys
 import subprocess
+import calendar
 import pandas as pd
-import pyarrow.parquet as pq
-import pyarrow as pa
+import numpy as np
 import datetime
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 # ============================
 # INSTALL PACKAGES
@@ -15,10 +17,9 @@ def install_if_missing(packages):
         try:
             __import__(package)
         except ImportError:
-            print(f"Installing {package}...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-required = ["imdlib", "pandas", "xarray", "pyarrow"]
+required = ["imdlib", "pandas", "numpy", "pyarrow"]
 install_if_missing(required)
 
 import imdlib as imd
@@ -44,12 +45,13 @@ yesterday = datetime.date.today() - datetime.timedelta(days=1)
 start_dy = yesterday.strftime("%Y-%m-%d")
 end_dy = start_dy
 
+year = yesterday.year
 date_tag = yesterday.strftime("%Y%m%d")
 
-print(f"Processing full grid for date: {start_dy}")
+print(f"Processing date: {start_dy}")
 
 # ============================
-# MAIN PROCESS
+# PROCESS LOOP
 # ============================
 
 for var in variables:
@@ -59,42 +61,93 @@ for var in variables:
         print(f"Processing variable: {var}")
 
         # ============================
-        # DOWNLOAD FULL GRID
+        # DOWNLOAD DATA
         # ============================
-
-        print("Downloading data using imdlib...")
 
         imd.get_real_data(var, start_dy, end_dy, file_dir=TEMP_DIR)
-
         data = imd.open_real_data(var, start_dy, end_dy, TEMP_DIR)
 
-        print("Data downloaded successfully")
+        np_array = data.data
+
+        print(f"Array shape: {np_array.shape}")
 
         # ============================
-        # CONVERT TO DATAFRAME (FULL GRID)
+        # GRID CONFIG
         # ============================
 
-        df = data.to_dataframe().reset_index()
-
-        print(f"Full grid size: {df.shape}")
+        if var == 'rain':
+            grid_size = 0.25
+            y_count = 129
+            x_count = 135
+            x_start = 66.5
+            y_start = 6.5
+        else:
+            grid_size = 1
+            y_count = 31
+            x_count = 31
+            x_start = 67.5
+            y_start = 7.5
 
         # ============================
-        # TEMP CSV
+        # CSV TEMP (GRID FORMAT)
         # ============================
 
         csv_path = os.path.join(TEMP_DIR, f"{var}.csv")
-        df.to_csv(csv_path, index=False)
+
+        with open(csv_path, 'w') as f:
+
+            days = 1  # single day
+            f.write("X,Y,1\n")
+
+            for j in range(y_count):
+                for i in range(x_count):
+
+                    lat = (j * grid_size) + y_start
+                    lon = (i * grid_size) + x_start
+
+                    val = np_array[0, i, j]
+
+                    if val in [99.9, -999]:
+                        val = -9999
+
+                    f.write(f"{lon},{lat},{val}\n")
 
         print("CSV created")
 
         # ============================
-        # TEMP XLSB
+        # XLSB TEMP
         # ============================
+
+        df = pd.read_csv(csv_path)
 
         xlsb_path = os.path.join(TEMP_DIR, f"{var}.xlsb")
         df.to_excel(xlsb_path, index=False)
 
         print("XLSB created")
+
+        # ============================
+        # LONG FORMAT (like your colab)
+        # ============================
+
+        df = pd.read_excel(xlsb_path)
+
+        df.replace(-9999, pd.NA, inplace=True)
+
+        long_df = df.melt(
+            id_vars=["X", "Y"],
+            value_vars=["1"],
+            var_name="day",
+            value_name=var
+        )
+
+        # create date column
+        long_df["date"] = pd.to_datetime(start_dy)
+
+        long_df.rename(columns={"X": "lon", "Y": "lat"}, inplace=True)
+
+        long_df = long_df[["date", "lat", "lon", var]]
+
+        print("Long format created")
 
         # ============================
         # PARQUET FINAL
@@ -105,13 +158,13 @@ for var in variables:
             f"{var}_{date_tag}.parquet"
         )
 
-        table = pa.Table.from_pandas(df)
+        table = pa.Table.from_pandas(long_df)
         pq.write_table(table, parquet_path)
 
         print(f"Parquet saved → {parquet_path}")
 
         # ============================
-        # CLEANUP TEMP FILES
+        # CLEANUP
         # ============================
 
         os.remove(csv_path)
