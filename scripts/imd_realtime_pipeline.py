@@ -1,17 +1,31 @@
-import requests
-import pandas as pd
-import numpy as np
-import datetime
 import os
+import sys
+import subprocess
+import pandas as pd
 import pyarrow.parquet as pq
 import pyarrow as pa
-import time
+import datetime
+
+# ============================
+# INSTALL PACKAGES
+# ============================
+
+def install_if_missing(packages):
+    for package in packages:
+        try:
+            __import__(package)
+        except ImportError:
+            print(f"Installing {package}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+required = ["imdlib", "pandas", "xarray", "pyarrow"]
+install_if_missing(required)
+
+import imdlib as imd
 
 # ============================
 # CONFIG
 # ============================
-
-BASE_URL = "https://www.imdpune.gov.in/Clim_Pred_LRF_New/Grided_Data_Download"
 
 OUTPUT_DIR = "data/realtime"
 TEMP_DIR = "temp"
@@ -19,168 +33,94 @@ TEMP_DIR = "temp"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-print("Directories verified")
-
-headers = {"User-Agent": "Mozilla/5.0"}
+variables = ["rain", "tmax", "tmin"]
 
 # ============================
-# DATES (Fallback: T-1, T-2)
+# DATE (YESTERDAY)
 # ============================
 
-dates_to_try = [
-    datetime.date.today() - datetime.timedelta(days=1),
-    datetime.date.today() - datetime.timedelta(days=2)
-]
+yesterday = datetime.date.today() - datetime.timedelta(days=1)
+
+start_dy = yesterday.strftime("%Y-%m-%d")
+end_dy = start_dy
+
+date_tag = yesterday.strftime("%Y%m%d")
+
+print(f"Processing full grid for date: {start_dy}")
 
 # ============================
-# GRID SPECS
+# MAIN PROCESS
 # ============================
 
-grids = {
-    "rainfall": (135, 129),
-    "tmax": (31, 31),
-    "tmin": (31, 31)
-}
+for var in variables:
 
-# ============================
-# DOWNLOAD FUNCTION
-# ============================
-
-def download_with_fallback(param):
-
-    for date_obj in dates_to_try:
-
-        date_temp = date_obj.strftime("%d%m%Y")
-        date_rain = date_obj.strftime("%y_%m_%d")
-        date_file = date_obj.strftime("%Y%m%d")
-
-        if param == "rainfall":
-            url = f"{BASE_URL}/rain_ind0.25_{date_rain}.grd"
-        elif param == "tmax":
-            url = f"{BASE_URL}/max1_{date_temp}.grd"
-        else:
-            url = f"{BASE_URL}/min1_{date_temp}.grd"
-
+    try:
         print("\n-----------------------------------")
-        print(f"Processing {param} for date: {date_obj}")
-        print(f"URL: {url}")
-
-        grd_path = f"{TEMP_DIR}/{param}.grd"
+        print(f"Processing variable: {var}")
 
         # ============================
-        # DOWNLOAD (Retry)
+        # DOWNLOAD FULL GRID
         # ============================
 
-        for attempt in range(3):
+        print("Downloading data using imdlib...")
 
-            try:
-                print(f"Attempt {attempt+1} download")
+        imd.get_real_data(var, start_dy, end_dy, file_dir=TEMP_DIR)
 
-                r = requests.get(url, headers=headers, timeout=60)
+        data = imd.open_real_data(var, start_dy, end_dy, TEMP_DIR)
 
-                if r.status_code == 200:
+        print("Data downloaded successfully")
 
-                    with open(grd_path, "wb") as f:
-                        f.write(r.content)
+        # ============================
+        # CONVERT TO DATAFRAME (FULL GRID)
+        # ============================
 
-                    print(f"{param}.grd downloaded successfully")
+        df = data.to_dataframe().reset_index()
 
-                    break
+        print(f"Full grid size: {df.shape}")
 
-                else:
-                    print(f"Not available (status {r.status_code})")
+        # ============================
+        # TEMP CSV
+        # ============================
 
-            except Exception as e:
-                print(f"Error: {e}")
+        csv_path = os.path.join(TEMP_DIR, f"{var}.csv")
+        df.to_csv(csv_path, index=False)
 
-            time.sleep(10)
+        print("CSV created")
 
-        # If file not downloaded → try next date
-        if not os.path.exists(grd_path):
-            print(f"{param} not available for {date_obj}, trying previous date...")
-            continue
+        # ============================
+        # TEMP XLSB
+        # ============================
 
-        try:
-            # ============================
-            # READ BINARY
-            # ============================
+        xlsb_path = os.path.join(TEMP_DIR, f"{var}.xlsb")
+        df.to_excel(xlsb_path, index=False)
 
-            rows, cols = grids[param]
+        print("XLSB created")
 
-            print("Reading binary file")
+        # ============================
+        # PARQUET FINAL
+        # ============================
 
-            data = np.fromfile(grd_path, dtype=np.float32)
+        parquet_path = os.path.join(
+            OUTPUT_DIR,
+            f"{var}_{date_tag}.parquet"
+        )
 
-            print(f"Values read: {len(data)}")
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, parquet_path)
 
-            data = data.reshape(rows, cols)
+        print(f"Parquet saved → {parquet_path}")
 
-            df = pd.DataFrame(data)
+        # ============================
+        # CLEANUP TEMP FILES
+        # ============================
 
-            print(f"DataFrame shape: {df.shape}")
+        os.remove(csv_path)
+        os.remove(xlsb_path)
 
-            # ============================
-            # CSV TEMP
-            # ============================
+        print("Temporary files deleted")
 
-            csv_path = f"{TEMP_DIR}/{param}.csv"
-
-            df.to_csv(csv_path, index=False)
-
-            if os.path.exists(csv_path):
-                print(f"{param}.csv created")
-
-            # ============================
-            # XLSB TEMP
-            # ============================
-
-            xlsb_path = f"{TEMP_DIR}/{param}.xlsb"
-
-            df.to_excel(xlsb_path, index=False)
-
-            if os.path.exists(xlsb_path):
-                print(f"{param}.xlsb created")
-
-            # ============================
-            # PARQUET FINAL
-            # ============================
-
-            parquet_path = f"{OUTPUT_DIR}/{param}_{date_file}.parquet"
-
-            table = pa.Table.from_pandas(df)
-
-            pq.write_table(table, parquet_path)
-
-            if os.path.exists(parquet_path):
-                print(f"{param}.parquet created")
-
-            # ============================
-            # DELETE TEMP FILES
-            # ============================
-
-            os.remove(grd_path)
-            os.remove(csv_path)
-            os.remove(xlsb_path)
-
-            print("Temporary files deleted")
-
-            return  # SUCCESS → stop fallback
-
-        except Exception as e:
-            print(f"Processing error: {e}")
-
-            # Clean partial files
-            if os.path.exists(grd_path):
-                os.remove(grd_path)
-
-    print(f"{param} → Not available for any date")
-
-# ============================
-# RUN PIPELINE
-# ============================
-
-for param in ["tmax", "tmin", "rainfall"]:
-    download_with_fallback(param)
+    except Exception as e:
+        print(f"Error processing {var}: {e}")
 
 print("\n-----------------------------------")
 print("Processing Complete")
