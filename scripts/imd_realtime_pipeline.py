@@ -7,6 +7,7 @@ import numpy as np
 import datetime
 import pyarrow as pa
 import pyarrow.parquet as pq
+import time
 
 # ============================
 # INSTALL PACKAGES
@@ -19,7 +20,7 @@ def install_if_missing(packages):
         except ImportError:
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-required = ["imdlib", "pandas", "numpy", "pyarrow"]
+required = ["imdlib", "pandas", "numpy", "pyarrow", "openpyxl"]
 install_if_missing(required)
 
 import imdlib as imd
@@ -45,10 +46,29 @@ yesterday = datetime.date.today() - datetime.timedelta(days=1)
 start_dy = yesterday.strftime("%Y-%m-%d")
 end_dy = start_dy
 
-year = yesterday.year
 date_tag = yesterday.strftime("%Y%m%d")
 
 print(f"Processing date: {start_dy}")
+
+# ============================
+# DOWNLOAD WITH RETRY
+# ============================
+
+def download_with_retry(var, start_dy, end_dy, retries=5):
+
+    for attempt in range(1, retries + 1):
+        try:
+            print(f"{var} → Attempt {attempt}")
+            imd.get_real_data(var, start_dy, end_dy, file_dir=TEMP_DIR)
+            print(f"{var} → Download successful")
+            return True
+
+        except Exception as e:
+            print(f"{var} → Error: {e}")
+            time.sleep(10)
+
+    print(f"{var} → Failed after retries")
+    return False
 
 # ============================
 # PROCESS LOOP
@@ -61,10 +81,14 @@ for var in variables:
         print(f"Processing variable: {var}")
 
         # ============================
-        # DOWNLOAD DATA
+        # DOWNLOAD
         # ============================
 
-        imd.get_real_data(var, start_dy, end_dy, file_dir=TEMP_DIR)
+        success = download_with_retry(var, start_dy, end_dy)
+
+        if not success:
+            continue
+
         data = imd.open_real_data(var, start_dy, end_dy, TEMP_DIR)
 
         np_array = data.data
@@ -89,14 +113,13 @@ for var in variables:
             y_start = 7.5
 
         # ============================
-        # CSV TEMP (GRID FORMAT)
+        # CSV TEMP
         # ============================
 
         csv_path = os.path.join(TEMP_DIR, f"{var}.csv")
 
         with open(csv_path, 'w') as f:
 
-            days = 1  # single day
             f.write("X,Y,1\n")
 
             for j in range(y_count):
@@ -115,21 +138,21 @@ for var in variables:
         print("CSV created")
 
         # ============================
-        # XLSB TEMP
+        # XLSX TEMP (FIXED)
         # ============================
 
         df = pd.read_csv(csv_path)
 
-        xlsb_path = os.path.join(TEMP_DIR, f"{var}.xlsb")
-        df.to_excel(xlsb_path, index=False)
+        xlsx_path = os.path.join(TEMP_DIR, f"{var}.xlsx")
+        df.to_excel(xlsx_path, index=False)
 
-        print("XLSB created")
+        print("XLSX created")
 
         # ============================
-        # LONG FORMAT (like your colab)
+        # LONG FORMAT
         # ============================
 
-        df = pd.read_excel(xlsb_path)
+        df = pd.read_excel(xlsx_path)
 
         df.replace(-9999, pd.NA, inplace=True)
 
@@ -140,7 +163,6 @@ for var in variables:
             value_name=var
         )
 
-        # create date column
         long_df["date"] = pd.to_datetime(start_dy)
 
         long_df.rename(columns={"X": "lon", "Y": "lat"}, inplace=True)
@@ -168,7 +190,7 @@ for var in variables:
         # ============================
 
         os.remove(csv_path)
-        os.remove(xlsb_path)
+        os.remove(xlsx_path)
 
         print("Temporary files deleted")
 
