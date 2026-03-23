@@ -1,15 +1,11 @@
 import os
 import sys
 import subprocess
-import pandas as pd
-import numpy as np
-import datetime
-import pyarrow as pa
-import pyarrow.parquet as pq
 import time
+import datetime
 
 # ============================
-# INSTALL PACKAGES
+# INSTALL PACKAGES FIRST
 # ============================
 
 def install_if_missing(packages):
@@ -17,11 +13,20 @@ def install_if_missing(packages):
         try:
             __import__(package)
         except ImportError:
+            print(f"Installing {package}...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 required = ["imdlib", "pandas", "numpy", "pyarrow", "openpyxl"]
 install_if_missing(required)
 
+# ============================
+# IMPORTS (AFTER INSTALL)
+# ============================
+
+import pandas as pd
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 import imdlib as imd
 
 # ============================
@@ -36,7 +41,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 variables = ["rain", "tmax", "tmin"]
 
-# yesterday
+# yesterday date
 date_obj = datetime.date.today() - datetime.timedelta(days=1)
 date_str = date_obj.strftime("%Y-%m-%d")
 date_tag = date_obj.strftime("%Y%m%d")
@@ -61,17 +66,13 @@ def download_with_retry(var, retries=5):
     return False
 
 # ============================
-# PROCESS LOOP
+# MAIN LOOP
 # ============================
 
 for var in variables:
 
     print("\n-----------------------------------")
     print(f"Processing variable: {var}")
-
-    # ============================
-    # DOWNLOAD
-    # ============================
 
     if not download_with_retry(var):
         continue
@@ -100,7 +101,7 @@ for var in variables:
             y_start = 7.5
 
         # ============================
-        # STEP 1: GRD → CSV
+        # STEP 1: CREATE CSV
         # ============================
 
         csv_path = os.path.join(TEMP_DIR, f"{var}.csv")
@@ -115,6 +116,7 @@ for var in variables:
                     lon = (i * grid_size) + x_start
 
                     val = np_array[0, i, j]
+
                     if val in [99.9, -999]:
                         val = -9999
 
@@ -123,7 +125,7 @@ for var in variables:
         print("CSV created")
 
         # ============================
-        # STEP 2: CSV → XLSX (temp)
+        # STEP 2: CSV → XLSX
         # ============================
 
         df = pd.read_csv(csv_path)
@@ -134,7 +136,7 @@ for var in variables:
         print("XLSX created")
 
         # ============================
-        # STEP 3: XLSX → LONG FORMAT
+        # STEP 3: LONG FORMAT
         # ============================
 
         df = pd.read_excel(xlsx_path)
@@ -171,13 +173,13 @@ for var in variables:
         print(f"Parquet saved → {parquet_path}")
 
         # ============================
-        # CLEANUP TEMP FILES
+        # CLEANUP
         # ============================
 
         os.remove(csv_path)
         os.remove(xlsx_path)
 
-        # also remove GRD files
+        # remove .grd files
         for file in os.listdir(TEMP_DIR):
             if file.endswith(".grd"):
                 os.remove(os.path.join(TEMP_DIR, file))
