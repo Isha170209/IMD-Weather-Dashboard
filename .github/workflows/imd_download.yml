@@ -1,42 +1,49 @@
-name: IMD Weather Pipeline
+name: IMD Realtime Pipeline
 
 on:
   schedule:
-    - cron: '30 2 * * *'   # 8:00 AM IST
+    - cron: '30 2 * * *'   # runs daily (adjust if needed)
   workflow_dispatch:
 
 jobs:
-
-  run_pipeline:
-
+  run-pipeline:
     runs-on: ubuntu-latest
 
     steps:
-
-    - name: Checkout Repo
+    # ============================
+    # STEP 1: CHECKOUT REPO
+    # ============================
+    - name: Checkout repository
       uses: actions/checkout@v4
 
+    # ============================
+    # STEP 2: SETUP PYTHON
+    # ============================
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.11
+        python-version: '3.11'
 
-    - name: Install Dependencies
-      run: |
-        pip install -r requirements.txt
-
-    - name: Run Script
+    # ============================
+    # STEP 3: RUN SCRIPT
+    # ============================
+    - name: Run IMD pipeline
       run: |
         python scripts/imd_realtime_pipeline.py
 
-    - name: Commit Parquet Files
+    # ============================
+    # STEP 4: COMMIT & PUSH (FIXED)
+    # ============================
+    - name: Commit and Push Parquet Files
       run: |
         git config --global user.name "github-actions"
         git config --global user.email "actions@github.com"
-        if ls data/realtime/*.parquet 1> /dev/null 2>&1; then
-            git add data/realtime/*.parquet
-            git commit -m "Daily IMD data update"
-            git push
-        else
-           echo "No parquet files generated"
-        fi
+
+        # Add parquet files
+        git add data/realtime/*.parquet || echo "No parquet files to add"
+
+        # Commit only if changes exist
+        git diff --cached --quiet || git commit -m "Daily IMD data update"
+
+        # ✅ FIXED PUSH (WITH AUTH)
+        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
