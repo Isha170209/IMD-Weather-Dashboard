@@ -1,7 +1,12 @@
 import os
 import sys
 import subprocess
-from time import sleep
+import pandas as pd
+import numpy as np
+import datetime
+import pyarrow as pa
+import pyarrow.parquet as pq
+import time
 
 # ============================
 # INSTALL PACKAGES
@@ -12,10 +17,9 @@ def install_if_missing(packages):
         try:
             __import__(package)
         except ImportError:
-            print(f"Installing {package}...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-required = ["imdlib"]
+required = ["imdlib", "pandas", "numpy", "pyarrow", "openpyxl"]
 install_if_missing(required)
 
 import imdlib as imd
@@ -24,71 +28,164 @@ import imdlib as imd
 # CONFIG
 # ============================
 
-start_dy = '2026-03-21'   # change as needed
-end_dy   = start_dy
+TEMP_DIR = "temp"
+OUTPUT_DIR = "data/realtime"
 
-variables = ['rain', 'tmax', 'tmin']
+os.makedirs(TEMP_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-output_path = "E:/IMD_REALTIME_DATA"   # change path
+variables = ["rain", "tmax", "tmin"]
 
-if not os.path.exists(output_path):
-    os.makedirs(output_path)
+# yesterday
+date_obj = datetime.date.today() - datetime.timedelta(days=1)
+date_str = date_obj.strftime("%Y-%m-%d")
+date_tag = date_obj.strftime("%Y%m%d")
+
+print(f"\nProcessing date: {date_str}")
 
 # ============================
-# DOWNLOAD FUNCTION (like your logic)
+# DOWNLOAD FUNCTION
 # ============================
 
-def download_full_grid(variable, start_dy, end_dy, path, retries=5):
-    
+def download_with_retry(var, retries=5):
     for attempt in range(1, retries + 1):
         try:
-            print(f"\n{variable.upper()} → Attempt {attempt}")
-            
-            # download GRD file
-            imd.get_real_data(variable, start_dy, end_dy, file_dir=path)
-            
-            print(f"✅ {variable} download successful")
+            print(f"{var} → Attempt {attempt}")
+            imd.get_real_data(var, date_str, date_str, file_dir=TEMP_DIR)
+            print(f"{var} → Download successful")
             return True
-
         except Exception as e:
-            print(f"❌ {variable} failed: {e}")
-            sleep(5)
-
-    print(f"❌ {variable} → Failed after {retries} attempts")
+            print(f"{var} → Error: {e}")
+            time.sleep(5)
+    print(f"{var} → Failed after retries")
     return False
 
 # ============================
-# MAIN LOOP (same slab-style idea)
+# PROCESS LOOP
 # ============================
-
-print(f"\nProcessing full IMD grid for date: {start_dy}\n")
 
 for var in variables:
 
-    print(f"\n-------------------------------")
-    print(f"Processing: {var}")
+    print("\n-----------------------------------")
+    print(f"Processing variable: {var}")
 
-    success = download_full_grid(var, start_dy, end_dy, output_path)
+    # ============================
+    # DOWNLOAD
+    # ============================
 
-    if not success:
+    if not download_with_retry(var):
         continue
 
     try:
-        # open downloaded data
-        data = imd.open_real_data(var, start_dy, end_dy, output_path)
+        data = imd.open_real_data(var, date_str, date_str, TEMP_DIR)
+        np_array = data.data
 
-        print(f"{var} → Data loaded successfully")
-        print(f"{var} → Array shape: {data.data.shape}")
+        print(f"Array shape: {np_array.shape}")
 
-        # Optional: save quick CSV preview (not per coordinate)
-        preview_file = os.path.join(output_path, f"{var}_{start_dy}_preview.csv")
-        data.to_csv(preview_file)
-        print(f"{var} → Preview CSV saved")
+        # ============================
+        # GRID CONFIG
+        # ============================
+
+        if var == 'rain':
+            grid_size = 0.25
+            y_count = 129
+            x_count = 135
+            x_start = 66.5
+            y_start = 6.5
+        else:
+            grid_size = 1
+            y_count = 31
+            x_count = 31
+            x_start = 67.5
+            y_start = 7.5
+
+        # ============================
+        # STEP 1: GRD → CSV
+        # ============================
+
+        csv_path = os.path.join(TEMP_DIR, f"{var}.csv")
+
+        with open(csv_path, 'w') as f:
+            f.write("X,Y,1\n")
+
+            for j in range(y_count):
+                for i in range(x_count):
+
+                    lat = (j * grid_size) + y_start
+                    lon = (i * grid_size) + x_start
+
+                    val = np_array[0, i, j]
+                    if val in [99.9, -999]:
+                        val = -9999
+
+                    f.write(f"{lon},{lat},{val}\n")
+
+        print("CSV created")
+
+        # ============================
+        # STEP 2: CSV → XLSX (temp)
+        # ============================
+
+        df = pd.read_csv(csv_path)
+
+        xlsx_path = os.path.join(TEMP_DIR, f"{var}.xlsx")
+        df.to_excel(xlsx_path, index=False)
+
+        print("XLSX created")
+
+        # ============================
+        # STEP 3: XLSX → LONG FORMAT
+        # ============================
+
+        df = pd.read_excel(xlsx_path)
+
+        df.replace(-9999, pd.NA, inplace=True)
+
+        long_df = df.melt(
+            id_vars=["X", "Y"],
+            value_vars=["1"],
+            var_name="day",
+            value_name=var
+        )
+
+        long_df["date"] = pd.to_datetime(date_str)
+
+        long_df.rename(columns={"X": "lon", "Y": "lat"}, inplace=True)
+
+        long_df = long_df[["date", "lat", "lon", var]]
+
+        print("Long format created")
+
+        # ============================
+        # STEP 4: SAVE PARQUET
+        # ============================
+
+        parquet_path = os.path.join(
+            OUTPUT_DIR,
+            f"{var}_{date_tag}.parquet"
+        )
+
+        table = pa.Table.from_pandas(long_df)
+        pq.write_table(table, parquet_path)
+
+        print(f"Parquet saved → {parquet_path}")
+
+        # ============================
+        # CLEANUP TEMP FILES
+        # ============================
+
+        os.remove(csv_path)
+        os.remove(xlsx_path)
+
+        # also remove GRD files
+        for file in os.listdir(TEMP_DIR):
+            if file.endswith(".grd"):
+                os.remove(os.path.join(TEMP_DIR, file))
+
+        print("Temporary files deleted")
 
     except Exception as e:
-        print(f"❌ Error processing {var}: {e}")
+        print(f"Error processing {var}: {e}")
 
-    sleep(2)  # same as your slab delay
-
-print("\n===============================")
-print("IMD Full Grid Download Complete")
+print("\n-----------------------------------")
+print("Processing Complete")
