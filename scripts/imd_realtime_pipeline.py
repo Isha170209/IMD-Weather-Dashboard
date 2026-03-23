@@ -34,12 +34,16 @@ import imdlib as imd
 # ============================
 
 TEMP_DIR = "temp"
-OUTPUT_DIR = "data/realtime"
+BASE_OUTPUT_DIR = "data/realtime"
 
 os.makedirs(TEMP_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
 
 variables = ["rain", "tmax", "tmin"]
+
+# Create subfolders
+for var in variables:
+    os.makedirs(os.path.join(BASE_OUTPUT_DIR, var), exist_ok=True)
 
 # yesterday date
 date_obj = datetime.date.today() - datetime.timedelta(days=1)
@@ -159,11 +163,13 @@ for var in variables:
         print("Long format created")
 
         # ============================
-        # STEP 4: SAVE PARQUET
+        # STEP 4: SAVE PARQUET (IN SUBFOLDER)
         # ============================
 
+        var_output_dir = os.path.join(BASE_OUTPUT_DIR, var)
+
         parquet_path = os.path.join(
-            OUTPUT_DIR,
+            var_output_dir,
             f"{var}_{date_tag}.parquet"
         )
 
