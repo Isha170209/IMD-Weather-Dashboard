@@ -28,7 +28,8 @@ img {
 
 # ================= ADMIN CONFIG =================
 ADMIN_EMAIL = "ishku1022@gmail.com"
-ADMIN_PASSWORD = "abc@1234"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+#ADMIN_PASSWORD = "abc@1234"
 
 # ================= EMAIL CONFIG =================
 SMTP_SERVER = "smtp.gmail.com"
