@@ -2,56 +2,27 @@ import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@lat
 
 await init();
 
-// 🔴 IMPORTANT: Replace these
-const username = "Ishku170209";
+// 🔴 UPDATE THIS
+const username = "YOUR_USERNAME";
 const repo = "Weather-Dashboard";
-const token = "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";  // ⚠ exposed in browser
 
 let extractedData = [];
 
-// 🔷 Resolution
+// 🔷 Resolution (same as your Streamlit logic)
 function getResolution(param) {
     return param === "rain" ? 0.25 : 1.0;
 }
 
-// 🔷 Snap to nearest grid (replacement of KDTree)
+// 🔷 Snap to nearest grid (replaces KDTree)
 function snap(value, resolution) {
     return Math.round(value / resolution) * resolution;
 }
 
-// 🔷 Get list of years between dates
+// 🔷 Get years from date range
 function getYears(start, end) {
     let years = [];
     for (let y = start; y <= end; y++) years.push(y);
     return years;
-}
-
-// 🔷 Fetch parquet from PRIVATE GitHub repo
-async function fetchParquetFromGitHub(path) {
-
-    const url = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
-
-    const response = await fetch(url, {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    });
-
-    if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // 🔷 Decode base64 → Uint8Array
-    const binary = atob(data.content);
-    const bytes = new Uint8Array(binary.length);
-
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-
-    return bytes;
 }
 
 // 🔷 MAIN FUNCTION
@@ -64,13 +35,19 @@ window.fetchData = async function () {
     const startDate = new Date(document.getElementById("startDate").value);
     const endDate = new Date(document.getElementById("endDate").value);
 
+    // 🔴 Validation
     if (isNaN(lat) || isNaN(lon)) {
         alert("Please enter valid latitude and longitude");
         return;
     }
 
-    if (!startDate || !endDate) {
-        alert("Please select valid dates");
+    if (!document.getElementById("startDate").value || !document.getElementById("endDate").value) {
+        alert("Please select start and end dates");
+        return;
+    }
+
+    if (startDate > endDate) {
+        alert("Start date cannot be after end date");
         return;
     }
 
@@ -83,16 +60,23 @@ window.fetchData = async function () {
 
     extractedData = [];
 
-    document.getElementById("output").innerText = "Loading...";
+    document.getElementById("output").innerText = "Loading data...";
 
     for (let year of years) {
 
-        const path = `data/${param}/${year}_${param}.parquet`;
+        const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
 
         try {
-            const bytes = await fetchParquetFromGitHub(path);
+            const response = await fetch(url);
 
-            const table = readParquet(bytes);
+            if (!response.ok) {
+                console.log(`Skipping ${year} (file not found)`);
+                continue;
+            }
+
+            const buffer = await response.arrayBuffer();
+
+            const table = readParquet(new Uint8Array(buffer));
             const data = table.toArray();
 
             data.forEach(row => {
@@ -115,14 +99,17 @@ window.fetchData = async function () {
             });
 
         } catch (err) {
-            console.log(`Skipping ${year}:`, err.message);
+            console.log(`Error loading ${year}:`, err.message);
         }
     }
 
     if (extractedData.length === 0) {
-        document.getElementById("output").innerText = "No data found.";
+        document.getElementById("output").innerText = "No data found for selected inputs.";
         return;
     }
+
+    // 🔷 Sort by date (important for time series)
+    extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     document.getElementById("output").innerText =
         JSON.stringify(extractedData.slice(0, 20), null, 2);
