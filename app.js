@@ -3,7 +3,7 @@ import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@lat
 await init();
 
 // 🔴 UPDATE THIS
-const username = "YOUR_USERNAME";
+const username = "Ishku170209";
 const repo = "Weather-Dashboard";
 
 let extractedData = [];
