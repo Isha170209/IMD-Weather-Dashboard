@@ -2,23 +2,28 @@ import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@lat
 
 await init();
 
-// 🔴 UPDATE THIS
-const username = "Ishku170209";
+const username = "YOUR_USERNAME";
 const repo = "Weather-Dashboard";
 
 let extractedData = [];
+let chartInstance = null;
 
-// 🔷 Resolution (same as your Streamlit logic)
+// 🔷 Sidebar toggle
+window.toggleSidebar = function () {
+    document.getElementById("sidebar").classList.toggle("hidden");
+};
+
+// 🔷 Resolution
 function getResolution(param) {
     return param === "rain" ? 0.25 : 1.0;
 }
 
-// 🔷 Snap to nearest grid (replaces KDTree)
-function snap(value, resolution) {
-    return Math.round(value / resolution) * resolution;
+// 🔷 Snap to grid
+function snap(val, res) {
+    return Math.round(val / res) * res;
 }
 
-// 🔷 Get years from date range
+// 🔷 Years
 function getYears(start, end) {
     let years = [];
     for (let y = start; y <= end; y++) years.push(y);
@@ -28,6 +33,9 @@ function getYears(start, end) {
 // 🔷 MAIN FUNCTION
 window.fetchData = async function () {
 
+    const status = document.getElementById("status");
+    status.innerText = "Loading...";
+
     const param = document.getElementById("param").value;
     const lat = parseFloat(document.getElementById("lat").value);
     const lon = parseFloat(document.getElementById("lon").value);
@@ -35,32 +43,18 @@ window.fetchData = async function () {
     const startDate = new Date(document.getElementById("startDate").value);
     const endDate = new Date(document.getElementById("endDate").value);
 
-    // 🔴 Validation
     if (isNaN(lat) || isNaN(lon)) {
-        alert("Please enter valid latitude and longitude");
+        alert("Enter valid lat/lon");
         return;
     }
 
-    if (!document.getElementById("startDate").value || !document.getElementById("endDate").value) {
-        alert("Please select start and end dates");
-        return;
-    }
-
-    if (startDate > endDate) {
-        alert("Start date cannot be after end date");
-        return;
-    }
-
-    const resolution = getResolution(param);
-
-    const nearestLat = snap(lat, resolution);
-    const nearestLon = snap(lon, resolution);
+    const res = getResolution(param);
+    const nearestLat = snap(lat, res);
+    const nearestLon = snap(lon, res);
 
     const years = getYears(startDate.getFullYear(), endDate.getFullYear());
 
     extractedData = [];
-
-    document.getElementById("output").innerText = "Loading data...";
 
     for (let year of years) {
 
@@ -68,65 +62,92 @@ window.fetchData = async function () {
 
         try {
             const response = await fetch(url);
-
-            if (!response.ok) {
-                console.log(`Skipping ${year} (file not found)`);
-                continue;
-            }
+            if (!response.ok) continue;
 
             const buffer = await response.arrayBuffer();
-
             const table = readParquet(new Uint8Array(buffer));
             const data = table.toArray();
 
             data.forEach(row => {
-
-                const rowDate = new Date(row.date);
+                const d = new Date(row.date);
 
                 if (
-                    rowDate >= startDate &&
-                    rowDate <= endDate &&
+                    d >= startDate &&
+                    d <= endDate &&
                     Math.abs(row.lat - nearestLat) < 0.001 &&
                     Math.abs(row.lon - nearestLon) < 0.001
                 ) {
                     extractedData.push({
                         date: row.date,
-                        lat: row.lat,
-                        lon: row.lon,
-                        value: row[param] ?? row.value
+                        value: row[param]
                     });
                 }
             });
 
-        } catch (err) {
-            console.log(`Error loading ${year}:`, err.message);
+        } catch (e) {
+            console.log(e);
         }
     }
 
     if (extractedData.length === 0) {
-        document.getElementById("output").innerText = "No data found for selected inputs.";
+        status.innerText = "No data found.";
         return;
     }
 
-    // 🔷 Sort by date (important for time series)
     extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    document.getElementById("output").innerText =
-        JSON.stringify(extractedData.slice(0, 20), null, 2);
+    status.innerText = "Data loaded successfully";
+
+    renderTable();
+    renderChart();
 };
+
+// 🔷 TABLE
+function renderTable() {
+
+    let html = "<table><tr><th>Date</th><th>Value</th></tr>";
+
+    extractedData.forEach(r => {
+        html += `<tr><td>${r.date}</td><td>${r.value}</td></tr>`;
+    });
+
+    html += "</table>";
+
+    document.getElementById("table").innerHTML = html;
+}
+
+// 🔷 CHART
+function renderChart() {
+
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    if (chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: extractedData.map(d => d.date),
+            datasets: [{
+                label: "Value",
+                data: extractedData.map(d => d.value),
+                borderWidth: 2
+            }]
+        }
+    });
+}
 
 // 🔷 CSV DOWNLOAD
 window.downloadCSV = function () {
 
     if (extractedData.length === 0) {
-        alert("No data available to download");
+        alert("No data to download");
         return;
     }
 
-    let csv = "date,lat,lon,value\n";
+    let csv = "date,value\n";
 
-    extractedData.forEach(row => {
-        csv += `${row.date},${row.lat},${row.lon},${row.value}\n`;
+    extractedData.forEach(r => {
+        csv += `${r.date},${r.value}\n`;
     });
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -138,12 +159,18 @@ window.downloadCSV = function () {
     a.click();
 };
 
-// 🔷 RESET FUNCTION
+// 🔷 RESET
 window.resetForm = function () {
+
     document.getElementById("lat").value = "";
     document.getElementById("lon").value = "";
     document.getElementById("startDate").value = "";
     document.getElementById("endDate").value = "";
-    document.getElementById("output").innerText = "";
+
+    document.getElementById("table").innerHTML = "";
+    document.getElementById("status").innerText = "";
+
+    if (chartInstance) chartInstance.destroy();
+
     extractedData = [];
 };
