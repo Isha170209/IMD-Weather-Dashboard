@@ -1,26 +1,19 @@
+import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@latest/+esm";
+
+await init();
+
 console.log("JS Loaded ✅");
+
+const username = "Isha170209";
+const repo = "Weather-Dashboard";
+
 let extractedData = [];
 let chartInstance = null;
 
-const username = "Ishku170209";
-const repo = "Weather-Dashboard";
-
-// 🔷 Load parquet dynamically
-async function loadParquet(url) {
-    const response = await fetch(url);
-    const buffer = await response.arrayBuffer();
-
-    const parquet = await import("https://cdn.jsdelivr.net/npm/parquet-wasm@latest/+esm");
-
-    await parquet.default();
-    return parquet.readParquet(new Uint8Array(buffer));
-}
-
 // 🔷 Sidebar toggle
-function toggleSidebar() {
+window.toggleSidebar = function () {
     document.getElementById("sidebar").classList.toggle("hidden");
-}
-window.toggleSidebar = toggleSidebar;
+};
 
 // 🔷 Resolution
 function getResolution(param) {
@@ -32,8 +25,8 @@ function snap(val, res) {
     return Math.round(val / res) * res;
 }
 
-// 🔷 Fetch Data
-async function fetchData() {
+// 🔷 MAIN FUNCTION
+window.fetchData = async function () {
 
     const status = document.getElementById("status");
     status.innerText = "Loading...";
@@ -46,7 +39,7 @@ async function fetchData() {
     const endDate = new Date(document.getElementById("endDate").value);
 
     if (isNaN(lat) || isNaN(lon)) {
-        alert("Enter valid lat/lon");
+        alert("Enter valid latitude/longitude");
         return;
     }
 
@@ -56,17 +49,16 @@ async function fetchData() {
 
     extractedData = [];
 
-    const years = [];
-    for (let y = startDate.getFullYear(); y <= endDate.getFullYear(); y++) {
-        years.push(y);
-    }
-
-    for (let year of years) {
+    for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
 
         const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
 
         try {
-            const table = await loadParquet(url);
+            const response = await fetch(url);
+            if (!response.ok) continue;
+
+            const buffer = await response.arrayBuffer();
+            const table = readParquet(new Uint8Array(buffer));
             const data = table.toArray();
 
             data.forEach(row => {
@@ -85,8 +77,8 @@ async function fetchData() {
                 }
             });
 
-        } catch (e) {
-            console.log("Error:", e);
+        } catch (err) {
+            console.log("Error loading year:", year);
         }
     }
 
@@ -101,8 +93,7 @@ async function fetchData() {
 
     renderTable();
     renderChart();
-}
-window.fetchData = fetchData;
+};
 
 // 🔷 TABLE
 function renderTable() {
@@ -121,7 +112,7 @@ function renderTable() {
 // 🔷 CHART
 function renderChart() {
 
-    const ctx = document.getElementById("chart").getContext("2d");
+    const ctx = document.getElementById("chart");
 
     if (chartInstance) chartInstance.destroy();
 
@@ -139,7 +130,7 @@ function renderChart() {
 }
 
 // 🔷 CSV
-function downloadCSV() {
+window.downloadCSV = function () {
 
     if (extractedData.length === 0) {
         alert("No data to download");
@@ -153,16 +144,15 @@ function downloadCSV() {
     });
 
     const blob = new Blob([csv], { type: "text/csv" });
-    const a = document.createElement("a");
 
+    const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "weather_data.csv";
     a.click();
-}
-window.downloadCSV = downloadCSV;
+};
 
 // 🔷 RESET
-function resetForm() {
+window.resetForm = function () {
 
     document.getElementById("lat").value = "";
     document.getElementById("lon").value = "";
@@ -175,5 +165,4 @@ function resetForm() {
     if (chartInstance) chartInstance.destroy();
 
     extractedData = [];
-}
-window.resetForm = resetForm;
+};
