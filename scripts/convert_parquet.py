@@ -4,11 +4,26 @@ import pandas as pd
 input_dir = "data"
 output_dir = "csv_output"
 
-CHUNK_SIZE = 200000   # adjust (try 100k–300k rows depending on dataset)
+# ✅ ONLY allowed folders
+ALLOWED_FOLDERS = {"rain", "tmin", "tmax"}
 
 os.makedirs(output_dir, exist_ok=True)
 
 for root, dirs, files in os.walk(input_dir):
+
+    # 🔥 extract top-level folder name after "data/"
+    parts = root.split(os.sep)
+
+    if len(parts) < 2:
+        continue
+
+    folder_name = parts[1]
+
+    # ❌ SKIP realtime or anything else
+    if folder_name not in ALLOWED_FOLDERS:
+        print(f"Skipping folder: {folder_name}")
+        continue
+
     for file in files:
         if file.endswith(".parquet"):
 
@@ -21,28 +36,11 @@ for root, dirs, files in os.walk(input_dir):
             save_dir = os.path.join(output_dir, relative_path)
             os.makedirs(save_dir, exist_ok=True)
 
-            base_name = file.replace(".parquet", "")
+            csv_path = os.path.join(
+                save_dir,
+                file.replace(".parquet", ".csv")
+            )
 
-            # 🔥 CHUNKING START
-            total_rows = len(df)
-            num_chunks = (total_rows // CHUNK_SIZE) + 1
+            df.to_csv(csv_path, index=False)
 
-            for i in range(num_chunks):
-                start = i * CHUNK_SIZE
-                end = start + CHUNK_SIZE
-
-                chunk = df.iloc[start:end]
-
-                if chunk.empty:
-                    continue
-
-                csv_path = os.path.join(
-                    save_dir,
-                    f"{base_name}_part{i+1}.csv"
-                )
-
-                chunk.to_csv(csv_path, index=False)
-
-                print(f"Saved chunk: {csv_path}")
-
-print("DONE ✅ All files chunked safely")
+print("DONE ✅ Only rain/tmin/tmax processed")
