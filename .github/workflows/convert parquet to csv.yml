@@ -22,7 +22,7 @@ jobs:
 
       - name: Convert Parquet to CSV
         run: |
-          python - <<EOF
+          python - << 'EOF'
 import os
 import pandas as pd
 
@@ -44,10 +44,9 @@ for root, dirs, files in os.walk(input_dir):
             os.makedirs(save_dir, exist_ok=True)
 
             csv_path = os.path.join(save_dir, file.replace(".parquet", ".csv"))
-
             df.to_csv(csv_path, index=False)
 
-print("DONE ✅")
+print("DONE")
 EOF
 
       - name: Commit CSV files
@@ -56,6 +55,5 @@ EOF
           git config user.email "actions@github.com"
 
           git add csv_output
-
-          git commit -m "Auto convert parquet to CSV" || echo "No changes"
+          git commit -m "Convert parquet to CSV" || echo "No changes"
           git push
