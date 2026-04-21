@@ -1,4 +1,4 @@
-import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@latest/+esm";
+import * as arrow from "https://cdn.jsdelivr.net/npm/apache-arrow@latest/+esm";
 
 console.log("Script starting...");
 
@@ -73,8 +73,16 @@ async function fetchData() {
 
             const buffer = await response.arrayBuffer();
             const table = readParquet(new Uint8Array(buffer));
-            const data = table.toArray();
-
+            const table = arrow.tableFromIPC(new Uint8Array(buffer));
+            const data = [];
+            for (let i = 0; i < table.numRows; i++) {
+                data.push({
+                    date: table.getChild("date").get(i),
+                    lat: table.getChild("lat").get(i),
+                    lon: table.getChild("lon").get(i),
+                    [param]: table.getChild(param).get(i)
+                });
+            }
             const grouped = {};
 
             data.forEach(row => {
