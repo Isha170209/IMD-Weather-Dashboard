@@ -265,3 +265,8 @@ window.resetForm = function () {
 
     extractedData = [];
 };
+document.getElementById("submitBtn").addEventListener("click", fetchData);
+document.getElementById("resetBtn").addEventListener("click", resetForm);
+document.getElementById("downloadBtn").addEventListener("click", downloadCSV);
+document.getElementById("csvBtn").addEventListener("click", processCSV);
+document.getElementById("toggleBtn").addEventListener("click", toggleSidebar);
