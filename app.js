@@ -1,37 +1,38 @@
-import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@latest/+esm";
-
-await init();
-
-const username = "YOUR_USERNAME";
-const repo = "Weather-Dashboard";
-
 let extractedData = [];
 let chartInstance = null;
 
+const username = "Ishku170209";
+const repo = "Weather-Dashboard";
+
+// 🔷 Load parquet dynamically
+async function loadParquet(url) {
+    const response = await fetch(url);
+    const buffer = await response.arrayBuffer();
+
+    const parquet = await import("https://cdn.jsdelivr.net/npm/parquet-wasm@latest/+esm");
+
+    await parquet.default();
+    return parquet.readParquet(new Uint8Array(buffer));
+}
+
 // 🔷 Sidebar toggle
-window.toggleSidebar = function () {
+function toggleSidebar() {
     document.getElementById("sidebar").classList.toggle("hidden");
-};
+}
+window.toggleSidebar = toggleSidebar;
 
 // 🔷 Resolution
 function getResolution(param) {
     return param === "rain" ? 0.25 : 1.0;
 }
 
-// 🔷 Snap to grid
+// 🔷 Snap
 function snap(val, res) {
     return Math.round(val / res) * res;
 }
 
-// 🔷 Years
-function getYears(start, end) {
-    let years = [];
-    for (let y = start; y <= end; y++) years.push(y);
-    return years;
-}
-
-// 🔷 MAIN FUNCTION
-window.fetchData = async function () {
+// 🔷 Fetch Data
+async function fetchData() {
 
     const status = document.getElementById("status");
     status.innerText = "Loading...";
@@ -52,20 +53,19 @@ window.fetchData = async function () {
     const nearestLat = snap(lat, res);
     const nearestLon = snap(lon, res);
 
-    const years = getYears(startDate.getFullYear(), endDate.getFullYear());
-
     extractedData = [];
+
+    const years = [];
+    for (let y = startDate.getFullYear(); y <= endDate.getFullYear(); y++) {
+        years.push(y);
+    }
 
     for (let year of years) {
 
         const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
 
         try {
-            const response = await fetch(url);
-            if (!response.ok) continue;
-
-            const buffer = await response.arrayBuffer();
-            const table = readParquet(new Uint8Array(buffer));
+            const table = await loadParquet(url);
             const data = table.toArray();
 
             data.forEach(row => {
@@ -85,22 +85,23 @@ window.fetchData = async function () {
             });
 
         } catch (e) {
-            console.log(e);
+            console.log("Error:", e);
         }
     }
 
     if (extractedData.length === 0) {
-        status.innerText = "No data found.";
+        status.innerText = "No data found";
         return;
     }
 
     extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    status.innerText = "Data loaded successfully";
+    status.innerText = "Data Loaded";
 
     renderTable();
     renderChart();
-};
+}
+window.fetchData = fetchData;
 
 // 🔷 TABLE
 function renderTable() {
@@ -136,8 +137,8 @@ function renderChart() {
     });
 }
 
-// 🔷 CSV DOWNLOAD
-window.downloadCSV = function () {
+// 🔷 CSV
+function downloadCSV() {
 
     if (extractedData.length === 0) {
         alert("No data to download");
@@ -151,16 +152,16 @@ window.downloadCSV = function () {
     });
 
     const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
-    a.href = url;
+
+    a.href = URL.createObjectURL(blob);
     a.download = "weather_data.csv";
     a.click();
-};
+}
+window.downloadCSV = downloadCSV;
 
 // 🔷 RESET
-window.resetForm = function () {
+function resetForm() {
 
     document.getElementById("lat").value = "";
     document.getElementById("lon").value = "";
@@ -173,4 +174,5 @@ window.resetForm = function () {
     if (chartInstance) chartInstance.destroy();
 
     extractedData = [];
-};
+}
+window.resetForm = resetForm;
