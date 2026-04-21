@@ -4,7 +4,7 @@ await init();
 
 console.log("JS Loaded ✅");
 
-const username = "Isha170209";
+const username = "Isha170209";   // 🔴 CHANGE THIS
 const repo = "Weather-Dashboard";
 
 let extractedData = [];
@@ -14,16 +14,6 @@ let chartInstance = null;
 window.toggleSidebar = function () {
     document.getElementById("sidebar").classList.toggle("hidden");
 };
-
-// 🔷 Resolution
-function getResolution(param) {
-    return param === "rain" ? 0.25 : 1.0;
-}
-
-// 🔷 Snap
-function snap(val, res) {
-    return Math.round(val / res) * res;
-}
 
 // 🔷 MAIN FUNCTION
 window.fetchData = async function () {
@@ -43,15 +33,14 @@ window.fetchData = async function () {
         return;
     }
 
-    const res = getResolution(param);
-    const nearestLat = snap(lat, res);
-    const nearestLon = snap(lon, res);
-
     extractedData = [];
 
+    // Loop through years
     for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
 
         const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
+
+        console.log("Loading:", url);
 
         try {
             const response = await fetch(url);
@@ -61,35 +50,57 @@ window.fetchData = async function () {
             const table = readParquet(new Uint8Array(buffer));
             const data = table.toArray();
 
+            // 🔷 NEAREST NEIGHBOUR PER DATE
+            const grouped = {};
+
             data.forEach(row => {
+
                 const d = new Date(row.date);
 
-                if (
-                    d >= startDate &&
-                    d <= endDate &&
-                    Math.abs(row.lat - nearestLat) < 0.001 &&
-                    Math.abs(row.lon - nearestLon) < 0.001
-                ) {
-                    extractedData.push({
+                // Date filter
+                if (d < startDate || d > endDate) return;
+
+                // Skip NaN
+                if (row[param] === null || isNaN(row[param])) return;
+
+                const key = row.date;
+
+                const dist = Math.sqrt(
+                    Math.pow(row.lat - lat, 2) +
+                    Math.pow(row.lon - lon, 2)
+                );
+
+                if (!grouped[key] || dist < grouped[key].dist) {
+                    grouped[key] = {
+                        dist: dist,
                         date: row.date,
                         value: row[param]
-                    });
+                    };
                 }
             });
 
+            // Push to final array
+            Object.values(grouped).forEach(r => {
+                extractedData.push({
+                    date: r.date,
+                    value: r.value
+                });
+            });
+
         } catch (err) {
-            console.log("Error loading year:", year);
+            console.log("Error loading year:", year, err);
         }
     }
 
     if (extractedData.length === 0) {
-        status.innerText = "No data found";
+        status.innerText = "No data found (check location/date)";
         return;
     }
 
+    // Sort by date
     extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    status.innerText = "Data Loaded";
+    status.innerText = `Data Loaded (${extractedData.length} records)`;
 
     renderTable();
     renderChart();
@@ -129,7 +140,7 @@ function renderChart() {
     });
 }
 
-// 🔷 CSV
+// 🔷 CSV DOWNLOAD
 window.downloadCSV = function () {
 
     if (extractedData.length === 0) {
