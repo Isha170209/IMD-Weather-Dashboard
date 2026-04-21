@@ -1,7 +1,7 @@
-name: One-time Parquet to CSV
+name: Convert Parquet to CSV
 
 on:
-  workflow_dispatch:   # manual trigger only
+  workflow_dispatch:   # manual run from GitHub Actions tab
 
 jobs:
   convert:
@@ -9,46 +9,51 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
-          pip install pandas pyarrow
+          pip install pandas pyarrow fastparquet
 
-      - name: Convert parquet to CSV
+      - name: Convert Parquet → CSV
         run: |
-          python <<EOF
-          import pandas as pd
-          import glob
           import os
+          import pandas as pd
 
-          files = glob.glob("data/**/*.parquet", recursive=True)
+          input_dir = "data"
+          output_dir = "csv_output"
+          os.makedirs(output_dir, exist_ok=True)
 
-          for file in files:
-              print("Processing:", file)
+          for root, dirs, files in os.walk(input_dir):
+              for file in files:
+                  if file.endswith(".parquet"):
+                      parquet_path = os.path.join(root, file)
 
-              df = pd.read_parquet(file)
+                      print(f"Processing {parquet_path}")
 
-              # OPTIONAL: keep only required columns
-              cols = [c for c in ["date","lat","lon","rain","tmax","tmin"] if c in df.columns]
-              df = df[cols]
+                      df = pd.read_parquet(parquet_path)
 
-              out_file = file.replace(".parquet", ".csv")
-              df.to_csv(out_file, index=False)
+                      relative_path = os.path.relpath(root, input_dir)
+                      save_dir = os.path.join(output_dir, relative_path)
+                      os.makedirs(save_dir, exist_ok=True)
 
-              print("Saved:", out_file)
+                      csv_name = file.replace(".parquet", ".csv")
+                      csv_path = os.path.join(save_dir, csv_name)
 
-          EOF
+                      df.to_csv(csv_path, index=False)
 
       - name: Commit CSV files
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
-          git add .
-          git commit -m "Converted parquet to CSV (one-time)" || echo "No changes"
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add csv_output
+
+          git commit -m "Auto convert parquet to csv" || echo "No changes"
+
           git push
