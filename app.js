@@ -3,9 +3,9 @@ import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@lat
 await init();
 
 // 🔴 IMPORTANT: Replace these
-const username = "YOUR_USERNAME";
+const username = "Ishku170209";
 const repo = "Weather-Dashboard";
-const token = "YOUR_GITHUB_TOKEN";  // ⚠ exposed in browser
+const token = "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";  // ⚠ exposed in browser
 
 let extractedData = [];
 
