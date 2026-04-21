@@ -4,18 +4,27 @@ await init();
 
 console.log("JS Loaded ✅");
 
-const username = "Isha170209";   // 🔴 CHANGE THIS
+const username = "isha170209";   // your github username
 const repo = "Weather-Dashboard";
 
 let extractedData = [];
 let chartInstance = null;
 
-// 🔷 Sidebar toggle
+// 🔷 MAP
+let map = L.map('map').setView([22, 78], 5);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(map);
+
+let markersLayer = L.layerGroup().addTo(map);
+
+// 🔷 SIDEBAR
 window.toggleSidebar = function () {
     document.getElementById("sidebar").classList.toggle("hidden");
 };
 
-// 🔷 MAIN FUNCTION
+// 🔷 SINGLE LOCATION
 window.fetchData = async function () {
 
     const status = document.getElementById("status");
@@ -29,18 +38,16 @@ window.fetchData = async function () {
     const endDate = new Date(document.getElementById("endDate").value);
 
     if (isNaN(lat) || isNaN(lon)) {
-        alert("Enter valid latitude/longitude");
+        alert("Enter valid lat/lon");
         return;
     }
 
     extractedData = [];
+    markersLayer.clearLayers();
 
-    // Loop through years
     for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
 
         const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
-
-        console.log("Loading:", url);
 
         try {
             const response = await fetch(url);
@@ -50,69 +57,148 @@ window.fetchData = async function () {
             const table = readParquet(new Uint8Array(buffer));
             const data = table.toArray();
 
-            // 🔷 NEAREST NEIGHBOUR PER DATE
             const grouped = {};
 
             data.forEach(row => {
 
                 const d = new Date(row.date);
-
-                // Date filter
                 if (d < startDate || d > endDate) return;
-
-                // Skip NaN
                 if (row[param] === null || isNaN(row[param])) return;
 
-                const key = row.date;
-
                 const dist = Math.sqrt(
-                    Math.pow(row.lat - lat, 2) +
-                    Math.pow(row.lon - lon, 2)
+                    (row.lat - lat) ** 2 +
+                    (row.lon - lon) ** 2
                 );
 
-                if (!grouped[key] || dist < grouped[key].dist) {
-                    grouped[key] = {
-                        dist: dist,
+                if (!grouped[row.date] || dist < grouped[row.date].dist) {
+                    grouped[row.date] = {
                         date: row.date,
-                        value: row[param]
+                        value: row[param],
+                        dist: dist
                     };
                 }
             });
 
-            // Push to final array
-            Object.values(grouped).forEach(r => {
-                extractedData.push({
-                    date: r.date,
-                    value: r.value
-                });
-            });
+            Object.values(grouped).forEach(v => extractedData.push(v));
 
-        } catch (err) {
-            console.log("Error loading year:", year, err);
-        }
+        } catch (e) {}
     }
 
     if (extractedData.length === 0) {
-        status.innerText = "No data found (check location/date)";
+        status.innerText = "No data found";
         return;
     }
 
-    // Sort by date
     extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    status.innerText = `Data Loaded (${extractedData.length} records)`;
+    status.innerText = `Loaded ${extractedData.length} records`;
 
-    renderTable();
-    renderChart();
+    renderTable(extractedData);
+    renderChart(extractedData);
+
+    // map marker
+    L.marker([lat, lon]).addTo(markersLayer)
+        .bindPopup("Selected Location");
+};
+
+// 🔷 MULTI LOCATION
+window.processCSV = async function () {
+
+    const file = document.getElementById("csvFile").files[0];
+    if (!file) {
+        alert("Upload CSV");
+        return;
+    }
+
+    const text = await file.text();
+    const rows = text.split("\n").slice(1);
+
+    const param = document.getElementById("param").value;
+    const startDate = new Date(document.getElementById("startDate").value);
+    const endDate = new Date(document.getElementById("endDate").value);
+
+    let finalData = [];
+    markersLayer.clearLayers();
+
+    for (let row of rows) {
+
+        const [name, latStr, lonStr] = row.split(",");
+        const lat = parseFloat(latStr);
+        const lon = parseFloat(lonStr);
+
+        if (isNaN(lat) || isNaN(lon)) continue;
+
+        let locData = [];
+
+        for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
+
+            const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) continue;
+
+                const buffer = await response.arrayBuffer();
+                const table = readParquet(new Uint8Array(buffer));
+                const data = table.toArray();
+
+                const grouped = {};
+
+                data.forEach(r => {
+
+                    const d = new Date(r.date);
+                    if (d < startDate || d > endDate) return;
+                    if (r[param] === null || isNaN(r[param])) return;
+
+                    const dist = Math.sqrt(
+                        (r.lat - lat) ** 2 +
+                        (r.lon - lon) ** 2
+                    );
+
+                    if (!grouped[r.date] || dist < grouped[r.date].dist) {
+                        grouped[r.date] = {
+                            date: r.date,
+                            value: r[param],
+                            dist: dist
+                        };
+                    }
+                });
+
+                Object.values(grouped).forEach(v => {
+                    locData.push({
+                        location: name,
+                        date: v.date,
+                        value: v.value
+                    });
+                });
+
+            } catch (e) {}
+        }
+
+        finalData.push(...locData);
+
+        L.marker([lat, lon]).addTo(markersLayer)
+            .bindPopup(`<b>${name}</b>`);
+    }
+
+    renderTable(finalData);
 };
 
 // 🔷 TABLE
-function renderTable() {
+function renderTable(data) {
 
-    let html = "<table><tr><th>Date</th><th>Value</th></tr>";
+    let html = "<table><tr>";
 
-    extractedData.forEach(r => {
-        html += `<tr><td>${r.date}</td><td>${r.value}</td></tr>`;
+    if (data[0].location) {
+        html += "<th>Location</th>";
+    }
+
+    html += "<th>Date</th><th>Value</th></tr>";
+
+    data.forEach(r => {
+        html += "<tr>";
+        if (r.location) html += `<td>${r.location}</td>`;
+        html += `<td>${r.date}</td><td>${r.value}</td></tr>`;
     });
 
     html += "</table>";
@@ -121,7 +207,7 @@ function renderTable() {
 }
 
 // 🔷 CHART
-function renderChart() {
+function renderChart(data) {
 
     const ctx = document.getElementById("chart");
 
@@ -130,21 +216,21 @@ function renderChart() {
     chartInstance = new Chart(ctx, {
         type: "line",
         data: {
-            labels: extractedData.map(d => d.date),
+            labels: data.map(d => d.date),
             datasets: [{
                 label: "Value",
-                data: extractedData.map(d => d.value),
+                data: data.map(d => d.value),
                 borderWidth: 2
             }]
         }
     });
 }
 
-// 🔷 CSV DOWNLOAD
+// 🔷 CSV
 window.downloadCSV = function () {
 
     if (extractedData.length === 0) {
-        alert("No data to download");
+        alert("No data");
         return;
     }
 
@@ -154,11 +240,11 @@ window.downloadCSV = function () {
         csv += `${r.date},${r.value}\n`;
     });
 
-    const blob = new Blob([csv], { type: "text/csv" });
-
+    const blob = new Blob([csv]);
     const a = document.createElement("a");
+
     a.href = URL.createObjectURL(blob);
-    a.download = "weather_data.csv";
+    a.download = "weather.csv";
     a.click();
 };
 
@@ -174,6 +260,8 @@ window.resetForm = function () {
     document.getElementById("status").innerText = "";
 
     if (chartInstance) chartInstance.destroy();
+
+    markersLayer.clearLayers();
 
     extractedData = [];
 };
