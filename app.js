@@ -4,7 +4,7 @@ await init();
 
 console.log("JS Loaded ✅");
 
-const username = "isha170209";   // your github username
+const username = "Isha170209";   // your github username
 const repo = "Weather-Dashboard";
 
 let extractedData = [];
