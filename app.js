@@ -1,3 +1,5 @@
+import * as arrow from "https://cdn.jsdelivr.net/npm/apache-arrow@latest/+esm";
+
 console.log("App started ✅");
 
 const username = "Isha170209";
@@ -26,7 +28,7 @@ window.addEventListener("DOMContentLoaded", () => {
     console.log("Buttons working ✅");
 });
 
-// 🔷 FETCH DATA
+// 🔷 FETCH DATA (PARQUET via Apache Arrow)
 async function fetchData() {
 
     const status = document.getElementById("status");
@@ -49,49 +51,62 @@ async function fetchData() {
 
     for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
 
-        const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}.csv`;
+        const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
 
         console.log("Fetching:", url);
 
         try {
             const res = await fetch(url);
-            if (!res.ok) continue;
 
-            const text = await res.text();
-            const rows = text.split("\n").slice(1);
+            if (!res.ok) {
+                console.log("File not found:", url);
+                continue;
+            }
+
+            const buffer = await res.arrayBuffer();
+
+            // 🔥 Read parquet (Arrow-compatible)
+            const table = await arrow.tableFromIPC(buffer);
+
+            console.log("Rows:", table.numRows);
+
+            const dateCol = table.getChild("date");
+            const latCol = table.getChild("lat");
+            const lonCol = table.getChild("lon");
+            const valCol = table.getChild(param);
 
             const grouped = {};
 
-            rows.forEach(line => {
+            for (let i = 0; i < table.numRows; i++) {
 
-                const [date, lat2, lon2, value] = line.split(",");
+                const date = dateCol.get(i);
+                const lat2 = latCol.get(i);
+                const lon2 = lonCol.get(i);
+                const value = valCol.get(i);
 
-                if (!date || !value) return;
+                if (!date || value == null) continue;
 
                 const d = new Date(date);
-                if (d < startDate || d > endDate) return;
-
-                const val = parseFloat(value);
-                if (isNaN(val)) return;
+                if (d < startDate || d > endDate) continue;
 
                 const dist = Math.sqrt(
-                    (parseFloat(lat2) - lat) ** 2 +
-                    (parseFloat(lon2) - lon) ** 2
+                    (lat2 - lat) ** 2 +
+                    (lon2 - lon) ** 2
                 );
 
                 if (!grouped[date] || dist < grouped[date].dist) {
                     grouped[date] = {
                         date,
-                        value: val,
+                        value,
                         dist
                     };
                 }
-            });
+            }
 
             Object.values(grouped).forEach(v => extractedData.push(v));
 
         } catch (err) {
-            console.log("Error loading:", url);
+            console.error("Error reading:", url, err);
         }
     }
 
