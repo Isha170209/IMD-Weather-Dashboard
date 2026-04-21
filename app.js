@@ -1,4 +1,7 @@
 import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@latest/+esm";
+window.addEventListener("DOMContentLoaded", () => {
+    console.log("DOM Ready ✅");
+});
 
 await init();
 
