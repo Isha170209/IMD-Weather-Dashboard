@@ -1,8 +1,5 @@
-import * as arrow from "https://cdn.jsdelivr.net/npm/apache-arrow@latest/+esm";
+console.log("App started ✅");
 
-console.log("Script starting...");
-
-// GLOBALS
 const username = "Isha170209";
 const repo = "Weather-Dashboard";
 
@@ -11,124 +8,111 @@ let chartInstance = null;
 let map;
 let markersLayer;
 
-// 🔷 INIT APP
-async function initApp() {
+// 🔷 INIT
+window.addEventListener("DOMContentLoaded", () => {
 
-    try {
-        console.log("Initializing parquet...");
-        await init();
-        console.log("Parquet initialized ✅");
+    map = L.map('map').setView([22, 78], 5);
 
-        // 🔷 MAP INIT
-        map = L.map('map').setView([22, 78], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
 
-        markersLayer = L.layerGroup().addTo(map);
+    document.getElementById("submitBtn").addEventListener("click", fetchData);
+    document.getElementById("resetBtn").addEventListener("click", resetForm);
+    document.getElementById("downloadBtn").addEventListener("click", downloadCSV);
 
-        // 🔷 BUTTON EVENTS
-        document.getElementById("submitBtn").addEventListener("click", fetchData);
-        document.getElementById("resetBtn").addEventListener("click", resetForm);
-        document.getElementById("downloadBtn").addEventListener("click", downloadCSV);
-
-        console.log("Buttons connected ✅");
-
-    } catch (err) {
-        console.error("INIT ERROR ❌", err);
-    }
-}
+    console.log("Buttons working ✅");
+});
 
 // 🔷 FETCH DATA
 async function fetchData() {
 
-    try {
-        const status = document.getElementById("status");
-        status.innerText = "Loading...";
+    const status = document.getElementById("status");
+    status.innerText = "Loading...";
 
-        const param = document.getElementById("param").value;
-        const lat = parseFloat(document.getElementById("lat").value);
-        const lon = parseFloat(document.getElementById("lon").value);
+    const param = document.getElementById("param").value;
+    const lat = parseFloat(document.getElementById("lat").value);
+    const lon = parseFloat(document.getElementById("lon").value);
 
-        const startDate = new Date(document.getElementById("startDate").value);
-        const endDate = new Date(document.getElementById("endDate").value);
+    const startDate = new Date(document.getElementById("startDate").value);
+    const endDate = new Date(document.getElementById("endDate").value);
 
-        if (isNaN(lat) || isNaN(lon)) {
-            alert("Enter valid lat/lon");
-            return;
-        }
+    if (isNaN(lat) || isNaN(lon)) {
+        alert("Enter valid lat/lon");
+        return;
+    }
 
-        extractedData = [];
-        markersLayer.clearLayers();
+    extractedData = [];
+    markersLayer.clearLayers();
 
-        for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
+    for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
 
-            const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
+        const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}.csv`;
 
-            console.log("Fetching:", url);
+        console.log("Fetching:", url);
 
-            const response = await fetch(url);
-            if (!response.ok) continue;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) continue;
 
-            const buffer = await response.arrayBuffer();
-            const table = readParquet(new Uint8Array(buffer));
-            const table = arrow.tableFromIPC(new Uint8Array(buffer));
-            const data = [];
-            for (let i = 0; i < table.numRows; i++) {
-                data.push({
-                    date: table.getChild("date").get(i),
-                    lat: table.getChild("lat").get(i),
-                    lon: table.getChild("lon").get(i),
-                    [param]: table.getChild(param).get(i)
-                });
-            }
+            const text = await res.text();
+            const rows = text.split("\n").slice(1);
+
             const grouped = {};
 
-            data.forEach(row => {
+            rows.forEach(line => {
 
-                const d = new Date(row.date);
+                const [date, lat2, lon2, value] = line.split(",");
+
+                if (!date || !value) return;
+
+                const d = new Date(date);
                 if (d < startDate || d > endDate) return;
-                if (row[param] === null || isNaN(row[param])) return;
+
+                const val = parseFloat(value);
+                if (isNaN(val)) return;
 
                 const dist = Math.sqrt(
-                    (row.lat - lat) ** 2 +
-                    (row.lon - lon) ** 2
+                    (parseFloat(lat2) - lat) ** 2 +
+                    (parseFloat(lon2) - lon) ** 2
                 );
 
-                if (!grouped[row.date] || dist < grouped[row.date].dist) {
-                    grouped[row.date] = {
-                        date: row.date,
-                        value: row[param],
-                        dist: dist
+                if (!grouped[date] || dist < grouped[date].dist) {
+                    grouped[date] = {
+                        date,
+                        value: val,
+                        dist
                     };
                 }
             });
 
             Object.values(grouped).forEach(v => extractedData.push(v));
+
+        } catch (err) {
+            console.log("Error loading:", url);
         }
-
-        if (extractedData.length === 0) {
-            status.innerText = "No data found";
-            return;
-        }
-
-        extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        status.innerText = `Loaded ${extractedData.length} records`;
-
-        renderTable();
-        renderChart();
-
-        L.marker([lat, lon]).addTo(markersLayer);
-
-    } catch (err) {
-        console.error("FETCH ERROR ❌", err);
     }
+
+    if (extractedData.length === 0) {
+        status.innerText = "No data found";
+        return;
+    }
+
+    extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    status.innerText = `Loaded ${extractedData.length} records`;
+
+    renderTable();
+    renderChart();
+
+    L.marker([lat, lon]).addTo(markersLayer);
 }
 
 // 🔷 TABLE
 function renderTable() {
+
     let html = "<table><tr><th>Date</th><th>Value</th></tr>";
 
     extractedData.forEach(r => {
@@ -160,7 +144,7 @@ function renderChart() {
     });
 }
 
-// 🔷 CSV
+// 🔷 CSV DOWNLOAD
 function downloadCSV() {
 
     if (extractedData.length === 0) {
@@ -169,12 +153,14 @@ function downloadCSV() {
     }
 
     let csv = "date,value\n";
+
     extractedData.forEach(r => {
         csv += `${r.date},${r.value}\n`;
     });
 
     const blob = new Blob([csv]);
     const a = document.createElement("a");
+
     a.href = URL.createObjectURL(blob);
     a.download = "weather.csv";
     a.click();
@@ -196,6 +182,3 @@ function resetForm() {
     markersLayer.clearLayers();
     extractedData = [];
 }
-
-// 🔷 START APP
-window.addEventListener("DOMContentLoaded", initApp);
