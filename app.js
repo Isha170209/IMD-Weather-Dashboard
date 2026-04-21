@@ -2,7 +2,11 @@ import init, { readParquet } from "https://cdn.jsdelivr.net/npm/parquet-wasm@lat
 window.addEventListener("DOMContentLoaded", () => {
     console.log("DOM Ready ✅");
 });
+let map = L.map('map').setView([22, 78], 5);
 
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(map);
 await init();
 
 console.log("JS Loaded ✅");
@@ -273,3 +277,4 @@ document.getElementById("resetBtn").addEventListener("click", resetForm);
 document.getElementById("downloadBtn").addEventListener("click", downloadCSV);
 document.getElementById("csvBtn").addEventListener("click", processCSV);
 document.getElementById("toggleBtn").addEventListener("click", toggleSidebar);
+
