@@ -2,42 +2,138 @@
 <html>
 <head>
   <title>Weather Dashboard</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      display: flex;
+    }
+
+    /* 🔴 SIDEBAR */
+    #sidebar {
+      width: 300px;
+      background: #b30000;
+      color: white;
+      padding: 20px;
+      height: 100vh;
+      transition: 0.3s;
+    }
+
+    #sidebar.hidden {
+      margin-left: -300px;
+    }
+
+    /* 🔴 MAIN CONTENT */
+    #main {
+      flex: 1;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h2 {
+      color: #b30000;
+    }
+
+    input, select {
+      width: 100%;
+      margin: 5px 0;
+      padding: 6px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-red {
+      background: #b30000;
+      color: white;
+    }
+
+    .btn-white {
+      background: white;
+      color: #b30000;
+      border: 2px solid #b30000;
+    }
+
+    #toggleBtn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #b30000;
+      color: white;
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: white;
+    }
+
+    table, th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>IMD Weather Data Download</h2>
+<button id="toggleBtn" onclick="toggleSidebar()">☰</button>
 
-<label>Parameter:</label>
-<select id="param">
-  <option value="rain">Rainfall</option>
-  <option value="tmin">Tmin</option>
-  <option value="tmax">Tmax</option>
-</select>
+<div id="sidebar">
 
-<br><br>
+  <h3>Filters</h3>
 
-<label>Latitude:</label>
-<input type="number" id="lat" step="0.01">
+  <label>Parameter</label>
+  <select id="param">
+    <option value="rain">Rainfall</option>
+    <option value="tmin">Tmin</option>
+    <option value="tmax">Tmax</option>
+  </select>
 
-<label>Longitude:</label>
-<input type="number" id="lon" step="0.01">
+  <label>Latitude</label>
+  <input type="number" id="lat" step="0.01">
 
-<br><br>
+  <label>Longitude</label>
+  <input type="number" id="lon" step="0.01">
 
-<label>Start Date:</label>
-<input type="date" id="startDate">
+  <label>Start Date</label>
+  <input type="date" id="startDate">
 
-<label>End Date:</label>
-<input type="date" id="endDate">
+  <label>End Date</label>
+  <input type="date" id="endDate">
 
-<br><br>
+  <button class="btn-red" onclick="fetchData()">Submit</button>
+  <button class="btn-white" onclick="resetForm()">Reset</button>
+  <button class="btn-red" onclick="downloadCSV()">Download CSV</button>
 
-<button onclick="fetchData()">Submit</button>
-<button onclick="resetForm()">Reset</button>
-<button onclick="downloadCSV()">Download CSV</button>
+</div>
 
-<h3>Preview</h3>
-<pre id="output"></pre>
+<div id="main">
+
+  <h2>Weather Data Output</h2>
+
+  <div id="status"></div>
+
+  <canvas id="chart"></canvas>
+
+  <br>
+
+  <div id="table"></div>
+
+</div>
 
 <script type="module" src="app.js"></script>
 
