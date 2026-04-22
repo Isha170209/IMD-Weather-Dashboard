@@ -1,7 +1,7 @@
 console.log("App started ✅");
 
 // 🔥 CHANGE THIS after deployment
-const API_BASE = "https://YOUR-BACKEND.onrender.com";
+const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
 
 let extractedData = [];
 let chartInstance = null;
