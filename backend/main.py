@@ -6,7 +6,6 @@ import os
 
 app = FastAPI()
 
-# ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,80 +14,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ================= FIXED PATH =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")   # IMPORTANT FIX
-
-print("DATA DIR:", DATA_DIR)
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
-# ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API is running"}
+    return {"message": "Weather API running"}
 
-# ================= WEATHER API =================
+
 @app.get("/weather")
 def get_weather(
-    param: str = Query(...),
-    lat: float = Query(...),
-    lon: float = Query(...),
-    start: str = Query(...),
-    end: str = Query(...)
+    param: str,
+    lat: float,
+    lon: float,
+    start: str,
+    end: str
 ):
 
-    try:
-        start_date = pd.to_datetime(start)
-        end_date = pd.to_datetime(end)
+    start_date = pd.to_datetime(start)
+    end_date = pd.to_datetime(end)
 
-        folder = os.path.join(DATA_DIR, param)
+    folder = os.path.join(DATA_DIR, param)
+    files = glob.glob(os.path.join(folder, "*.parquet"))
 
-        # ✅ FIX: correct file search
-        files = glob.glob(os.path.join(folder, "*.parquet"))
+    if not files:
+        return []
 
-        if not files:
-            return []
+    all_data = []
 
-        all_data = []
+    for file in files:
+        df = pd.read_parquet(file)
 
-        for file in files:
-            try:
-                df = pd.read_parquet(file)
+        # 🔥 FIX 1: normalize columns
+        df.columns = [c.lower() for c in df.columns]
 
-                if "date" not in df.columns:
-                    continue
+        # safety check
+        required_cols = ["date", "lat", "lon", param]
+        if not all(col in df.columns for col in required_cols):
+            continue
 
-                df["date"] = pd.to_datetime(df["date"])
+        # 🔥 FIX 2: parse types
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+        df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
 
-                # date filter
-                df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
+        df = df.dropna(subset=["date", "lat", "lon"])
 
-                if df.empty:
-                    continue
+        # 🔥 FIX 3: date filter
+        df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
-                # nearest grid
-                df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
-                df = df.sort_values("dist")
+        if df.empty:
+            continue
 
-                df = df.groupby("date").first().reset_index()
+        # 🔥 FIX 4: nearest grid selection
+        df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
+        df = df.sort_values("dist")
 
-                # keep only required columns
-                if param in df.columns:
-                    all_data.append(df[["date", param]])
-                else:
-                    continue
+        df = df.groupby("date").first().reset_index()
 
-            except Exception as e:
-                print("File error:", file, e)
-                continue
+        all_data.append(df[["date", param]])
 
-        if not all_data:
-            return []
+    if not all_data:
+        return []
 
-        final_df = pd.concat(all_data)
-        final_df = final_df.sort_values("date")
+    final_df = pd.concat(all_data)
+    final_df = final_df.sort_values("date")
 
-        return final_df.to_dict(orient="records")
-
-    except Exception as e:
-        return {"error": str(e)}
+    return final_df.to_dict(orient="records")
