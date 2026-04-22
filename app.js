@@ -1,191 +1,114 @@
-console.log("App started ✅");
+const API = "https://weather-dashboard-9dn4.onrender.com";
 
-const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
+let chartInstance;
+let map, rectangle;
 
-let extractedData = [];
-let chartInstance = null;
+// ================= SECTION SWITCH =================
+function showSection(id){
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
 
-// ================= DOM ELEMENTS =================
-const paramEl = document.getElementById("param");
-const latEl = document.getElementById("lat");
-const lonEl = document.getElementById("lon");
-const startDateEl = document.getElementById("startDate");
-const endDateEl = document.getElementById("endDate");
-
-const submitBtn = document.getElementById("submitBtn");
-const resetBtn = document.getElementById("resetBtn");
-const downloadBtn = document.getElementById("downloadBtn");
-
-const dailyTable = document.getElementById("dailyTable");
-const summaryTable = document.getElementById("summaryTable");
-
-// ================= PAGE =================
-window.openDashboard = function () {
-    document.getElementById("homePage").style.display = "none";
-    document.getElementById("dashboardPage").style.display = "block";
-};
-
-window.goHome = function () {
-    document.getElementById("dashboardPage").style.display = "none";
-    document.getElementById("homePage").style.display = "block";
-};
-
-// ================= INIT =================
-window.addEventListener("DOMContentLoaded", () => {
-    submitBtn.addEventListener("click", fetchData);
-    resetBtn.addEventListener("click", resetForm);
-    downloadBtn.addEventListener("click", downloadCSV);
-
-    console.log("Buttons working ✅");
-});
-
-// ================= FETCH =================
-async function fetchData() {
-
-    const param = paramEl.value;
-    const lat = parseFloat(latEl.value);
-    const lon = parseFloat(lonEl.value);
-
-    const start = startDateEl.value;
-    const end = endDateEl.value;
-
-    if (isNaN(lat) || isNaN(lon)) {
-        alert("Enter valid lat/lon");
-        return;
-    }
-
-    const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${start}&end=${end}`;
-
-    console.log("Calling API:", url);
-
-    try {
-        const res = await fetch(url);
-
-        if (!res.ok) throw new Error("API error");
-
-        const data = await res.json();
-
-        console.log("API Response:", data);
-
-        if (!Array.isArray(data) || data.length === 0) {
-            alert("No data");
-            return;
-        }
-
-        extractedData = data.map(d => ({
-            date: d.date,
-            value: d[param]
-        }));
-
-        renderChart(param);
-        renderDailyTable(param);
-        renderSummary(param);
-
-    } catch (err) {
-        console.error(err);
-        alert("Error loading data");
+    // Fix map rendering issue
+    if(id === "mapSection" && map){
+        setTimeout(()=>map.invalidateSize(), 200);
     }
 }
 
-// ================= CHART =================
-function renderChart(param) {
+// ================= SINGLE LOCATION =================
+async function fetchSingle(){
 
-    const ctx = document.getElementById("chart");
+    let param = document.getElementById("param").value;
+    let lat = document.getElementById("lat").value;
+    let lon = document.getElementById("lon").value;
+    let start = document.getElementById("start").value;
+    let end = document.getElementById("end").value;
 
-    if (chartInstance) chartInstance.destroy();
+    let url = `${API}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${start}&end=${end}`;
 
-    chartInstance = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: extractedData.map(d => d.date),
-            datasets: [{
-                label: getUnitLabel(param),
-                data: extractedData.map(d => d.value),
-                borderWidth: 2
+    let res = await fetch(url);
+    let data = await res.json();
+
+    if(!data.length) return alert("No data");
+
+    // TABLE
+    let html = "<table><tr><th>Date</th><th>Value</th></tr>";
+    data.forEach(d=>{
+        html += `<tr><td>${d.date}</td><td>${d[param]}</td></tr>`;
+    });
+    html += "</table>";
+    document.getElementById("table").innerHTML = html;
+
+    // CHART
+    if(chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(document.getElementById("chart"), {
+        type:"line",
+        data:{
+            labels: data.map(d=>d.date),
+            datasets:[{
+                label:param,
+                data:data.map(d=>d[param])
             }]
         }
     });
 }
 
-// ================= DAILY TABLE =================
-function renderDailyTable(param) {
+// ================= MAP =================
+function initMap(){
+    map = L.map('map').setView([22,78],5);
 
-    let html = `<table>
-    <tr><th>Date</th><th>${getUnitLabel(param)}</th></tr>`;
-
-    extractedData.forEach(r => {
-        html += `<tr><td>${r.date}</td><td>${r.value}</td></tr>`;
-    });
-
-    html += "</table>";
-
-    dailyTable.innerHTML = html;
+    L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    ).addTo(map);
 }
 
-// ================= SUMMARY =================
-function renderSummary(param) {
+async function loadMap(){
 
-    const values = extractedData.map(d => d.value);
+    if(!map) initMap();
 
-    const avg = (values.reduce((a,b)=>a+b,0) / values.length).toFixed(2);
-    const max = Math.max(...values);
-    const min = Math.min(...values);
-    const sum = values.reduce((a,b)=>a+b,0);
+    let lat = parseFloat(document.getElementById("mapLat").value);
+    let lon = parseFloat(document.getElementById("mapLon").value);
+    let date = document.getElementById("mapDate").value;
+    let param = document.getElementById("mapParam").value;
 
-    let html = `<table>
-    <tr><th>Metric</th><th>${getUnitLabel(param)}</th></tr>
-    <tr><td>Average</td><td>${avg}</td></tr>
-    <tr><td>Max</td><td>${max}</td></tr>
-    <tr><td>Min</td><td>${min}</td></tr>`;
+    let url = `${API}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${date}&end=${date}`;
 
-    if (param === "rain") {
-        html += `<tr><td>Total Rainfall</td><td>${sum}</td></tr>`;
-    }
+    let res = await fetch(url);
+    let data = await res.json();
 
-    html += "</table>";
+    if(!data.length) return alert("No data");
 
-    summaryTable.innerHTML = html;
-}
+    let val = data[0][param];
 
-// ================= UTIL =================
-function getUnitLabel(param) {
-    if (param === "rain") return "Rainfall (mm)";
-    if (param === "tmin" || param === "tmax") return "Temperature (°C)";
+    map.setView([lat, lon], 8);
+
+    if(rectangle) map.removeLayer(rectangle);
+
+    let bounds = [
+        [lat-0.125, lon-0.125],
+        [lat+0.125, lon+0.125]
+    ];
+
+    rectangle = L.rectangle(bounds, {color:'red'}).addTo(map);
+    rectangle.bindPopup(`${param}: ${val}`).openPopup();
 }
 
 // ================= CSV =================
-function downloadCSV() {
+async function processCSV(){
 
-    if (extractedData.length === 0) {
-        alert("No data");
-        return;
+    let file = document.getElementById("csvFile").files[0];
+    let text = await file.text();
+
+    let rows = text.split("\n");
+
+    for(let r of rows){
+        let [lat, lon] = r.split(",");
+        if(!lat) continue;
+
+        let url = `${API}/weather?param=rain&lat=${lat}&lon=${lon}&start=2003-01-01&end=2003-01-03`;
+
+        await fetch(url);
     }
 
-    let csv = "date,value\n";
-
-    extractedData.forEach(r => {
-        csv += `${r.date},${r.value}\n`;
-    });
-
-    const blob = new Blob([csv]);
-    const a = document.createElement("a");
-
-    a.href = URL.createObjectURL(blob);
-    a.download = "weather.csv";
-    a.click();
-}
-
-// ================= RESET =================
-function resetForm() {
-    extractedData = [];
-
-    if (chartInstance) chartInstance.destroy();
-
-    dailyTable.innerHTML = "";
-    summaryTable.innerHTML = "";
-
-    latEl.value = "";
-    lonEl.value = "";
-    startDateEl.value = "";
-    endDateEl.value = "";
+    alert("Done processing CSV");
 }
