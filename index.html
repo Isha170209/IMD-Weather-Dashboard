@@ -7,6 +7,9 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
+<!-- Optional favicon fix -->
+<link rel="icon" href="data:,">
+
 <style>
 body { margin:0; font-family:Arial; }
 
@@ -85,6 +88,14 @@ th, td {
   border:1px solid #ddd;
   padding:6px;
 }
+
+/* 🔥 Better checkbox alignment */
+.checkbox-label {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:18px;
+}
 </style>
 </head>
 
@@ -95,6 +106,7 @@ th, td {
 
 <div id="controls">
 
+<!-- Parameter -->
 <div class="filterTab">
 <div class="tabTitle">Parameter</div>
 <select id="param">
@@ -104,26 +116,40 @@ th, td {
 </select>
 </div>
 
+<!-- Latitude -->
 <div class="filterTab">
 <div class="tabTitle">Latitude</div>
 <input type="number" id="lat" placeholder="19.07">
 </div>
 
+<!-- Longitude -->
 <div class="filterTab">
 <div class="tabTitle">Longitude</div>
 <input type="number" id="lon" placeholder="72.87">
 </div>
 
+<!-- Start Date -->
 <div class="filterTab">
 <div class="tabTitle">Start Date</div>
 <input type="date" id="startDate">
 </div>
 
+<!-- End Date -->
 <div class="filterTab">
 <div class="tabTitle">End Date</div>
 <input type="date" id="endDate">
 </div>
 
+<!-- 🔥 NEW: Aggregation -->
+<div class="filterTab">
+<div class="tabTitle">Aggregation</div>
+<label class="checkbox-label">
+<input type="checkbox" id="monthlyToggle">
+<span>Monthly</span>
+</label>
+</div>
+
+<!-- Actions -->
 <div class="filterTab">
 <div class="tabTitle">Actions</div>
 <button id="submitBtn" class="btn-red">Submit</button>
@@ -145,7 +171,7 @@ th, td {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- IMPORTANT: correct path -->
+<!-- IMPORTANT -->
 <script src="./app.js" type="module"></script>
 
 </body>
