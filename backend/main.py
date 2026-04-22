@@ -8,7 +8,7 @@ app = FastAPI()
 # ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # allows GitHub Pages frontend
+    allow_origins=["*"],   # allow GitHub Pages
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -17,16 +17,7 @@ app.add_middleware(
 # ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API is running ✅"}
-
-# ================= DEBUG =================
-@app.get("/debug")
-def debug():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    return {
-        "base_dir": base_dir,
-        "folders": os.listdir(base_dir)
-    }
+    return {"message": "Weather API running ✅"}
 
 # ================= WEATHER API =================
 @app.get("/weather")
@@ -39,68 +30,71 @@ def get_weather(
 ):
     try:
         # -------------------------
-        # Parse dates safely
+        # Parse dates
         # -------------------------
         start_date = pd.to_datetime(start, errors="coerce")
         end_date = pd.to_datetime(end, errors="coerce")
 
         if pd.isna(start_date) or pd.isna(end_date):
-            return {"error": "Invalid date format"}
+            return {"error": "Invalid date"}
 
         # -------------------------
-        # Set path
+        # Path setup
         # -------------------------
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(base_dir, param)   # backend/rain, tmin, tmax
+        data_dir = os.path.join(base_dir, param)
 
         if not os.path.exists(data_dir):
             return {"error": f"{param} folder not found"}
 
         # -------------------------
-        # STRICT YEAR FILTER
+        # Select ONLY required years
         # -------------------------
-        start_year = start_date.year
-        end_year = end_date.year
-
         files = []
+        for year in range(start_date.year, end_date.year + 1):
+            f = os.path.join(data_dir, f"{year}_{param}.parquet")
+            if os.path.exists(f):
+                files.append(f)
 
-        for year in range(start_year, end_year + 1):
-            file_path = os.path.join(data_dir, f"{year}_{param}.parquet")
-
-            if os.path.exists(file_path):
-                files.append(file_path)
-            else:
-                print(f"Missing file: {file_path}")
-
-        if len(files) == 0:
-            return {"error": f"No files found for selected years"}
-
-        print("Files being used:", files)
-
-        all_data = []
+        if not files:
+            return []
 
         # -------------------------
-        # Process files
+        # VERY IMPORTANT: small bounding box
         # -------------------------
+        LAT_BUFFER = 0.5   # reduce further for stability
+        LON_BUFFER = 0.5
+
+        results = []
+
         for file in files:
             try:
-                print(f"Reading: {file}")
-
-                # 🔥 MEMORY SAFE READ
+                # -------------------------
+                # Read only needed columns
+                # -------------------------
                 df = pd.read_parquet(
                     file,
                     columns=["date", "lat", "lon", param]
                 )
 
                 # -------------------------
-                # Clean data
+                # 🔥 SPATIAL FILTER FIRST
                 # -------------------------
-                df["date"] = pd.to_datetime(df["date"], errors="coerce")
-                df = df.dropna(subset=["date", param])
+                df = df[
+                    (df["lat"] >= lat - LAT_BUFFER) &
+                    (df["lat"] <= lat + LAT_BUFFER) &
+                    (df["lon"] >= lon - LON_BUFFER) &
+                    (df["lon"] <= lon + LON_BUFFER)
+                ]
+
+                if df.empty:
+                    continue
 
                 # -------------------------
-                # Filter by date EARLY
+                # Date filter
                 # -------------------------
+                df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
                 df = df[
                     (df["date"] >= start_date) &
                     (df["date"] <= end_date)
@@ -110,7 +104,7 @@ def get_weather(
                     continue
 
                 # -------------------------
-                # Nearest grid point
+                # Find nearest point
                 # -------------------------
                 df["dist"] = (
                     (df["lat"] - lat) ** 2 +
@@ -118,36 +112,22 @@ def get_weather(
                 )
 
                 df = df.sort_values("dist")
+
                 df = df.groupby("date").first().reset_index()
 
-                # -------------------------
-                # Keep required columns
-                # -------------------------
-                df = df[["date", param]]
+                results.append(df[["date", param]])
 
-                all_data.append(df)
-
-            except Exception as file_error:
-                print(f"Error in file {file}: {file_error}")
+            except Exception as e:
+                print("File error:", file, e)
                 continue
 
-        # -------------------------
-        # No data case
-        # -------------------------
-        if len(all_data) == 0:
+        if not results:
             return []
 
-        # -------------------------
-        # Combine results
-        # -------------------------
-        final_df = pd.concat(all_data)
-        final_df = final_df.sort_values("date")
+        final_df = pd.concat(results).sort_values("date")
 
-        # -------------------------
-        # Return JSON
-        # -------------------------
         return final_df.to_dict(orient="records")
 
     except Exception as e:
-        print("MAIN ERROR:", str(e))
+        print("MAIN ERROR:", e)
         return {"error": str(e)}
