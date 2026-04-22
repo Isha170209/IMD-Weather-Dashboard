@@ -1,5 +1,6 @@
 console.log("App started ✅");
 
+// 🔥 YOUR BACKEND URL
 const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
 
 let extractedData = [];
@@ -44,24 +45,28 @@ async function fetchData() {
     }
 
     try {
+        const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
 
-        const url =
-            `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
+        console.log("Calling API:", url);
 
         const res = await fetch(url);
+
+        if (!res.ok) {
+            throw new Error("API error");
+        }
+
         const data = await res.json();
 
         console.log("API Response:", data);
 
         if (!Array.isArray(data) || data.length === 0) {
             status.innerText = "No data found";
-            extractedData = [];
             return;
         }
 
         extractedData = data.map(d => ({
             date: d.date,
-            value: d[param] ?? d.value
+            value: d[param]
         }));
 
         status.innerText = `Loaded ${extractedData.length} records`;
