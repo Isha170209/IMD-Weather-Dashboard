@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import glob
 import os
 
 app = FastAPI()
@@ -14,20 +15,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ================= PATH FIX =================
-# 🔥 IMPORTANT: works correctly on Render
-BASE_DIR = os.getcwd()
-DATA_DIR = os.path.join(BASE_DIR, "backend", "data")
-
-print("BASE_DIR:", BASE_DIR)
-print("DATA_DIR:", DATA_DIR)
-
+# 🔥 FIXED PATH
+DATA_DIR = "backend/data"
 
 # ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API running ✅"}
-
+    return {"message": "Weather API is running"}
 
 # ================= WEATHER API =================
 @app.get("/weather")
@@ -38,94 +32,61 @@ def get_weather(
     start: str = Query(...),
     end: str = Query(...)
 ):
+
     try:
-        print("\n================ NEW REQUEST ================")
-        print("PARAM:", param)
-        print("LAT/LON:", lat, lon)
-        print("DATE RANGE:", start, "to", end)
+        start_date = pd.to_datetime(start)
+        end_date = pd.to_datetime(end)
 
-        # 🔥 convert dates properly
-        start_date = pd.to_datetime(start).date()
-        end_date = pd.to_datetime(end).date()
+        # 🔥 Correct file pattern
+        file_pattern = os.path.join(DATA_DIR, param, f"*_{param}.parquet")
+        files = sorted(glob.glob(file_pattern))
 
-        print("Parsed Dates:", start_date, end_date)
+        print("FILES FOUND:", files)
 
-        # 🔥 check folder exists
-        param_path = os.path.join(DATA_DIR, param)
-        print("Looking in folder:", param_path)
-
-        if not os.path.exists(param_path):
-            print("❌ Folder NOT found!")
-            return {"error": f"{param} folder not found"}
-
-        print("Files available:", os.listdir(param_path))
-
-        years = range(start_date.year, end_date.year + 1)
+        if not files:
+            return {"error": f"No files found for {param}"}
 
         all_data = []
 
-        for year in years:
+        for file in files:
+            print("READING:", file)
 
-            file_path = os.path.join(param_path, f"{year}_{param}.parquet")
+            df = pd.read_parquet(file)
 
-            print("\nChecking file:", file_path)
-            print("Exists?", os.path.exists(file_path))
+            print("Columns:", df.columns)
 
-            if not os.path.exists(file_path):
+            # normalize columns
+            df.columns = [c.lower() for c in df.columns]
+
+            if not {"date", "lat", "lon", param}.issubset(df.columns):
+                print("Skipping file due to missing columns:", file)
                 continue
 
-            # ================= READ FILE =================
-            df = pd.read_parquet(file_path)
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-            print("Columns:", df.columns.tolist())
-            print("Total rows:", len(df))
-
-            if len(df) == 0:
-                continue
-
-            # ================= DATE FIX =================
-            df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
-
-            print("Min date:", df["date"].min())
-            print("Max date:", df["date"].max())
-
-            # ================= FILTER =================
             df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
-            print("Rows after date filter:", len(df))
-
             if df.empty:
-                print("⚠️ No rows in selected date range")
                 continue
 
-            # ================= DISTANCE =================
-            df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
-
+            # nearest grid
+            df["dist"] = ((df["lat"] - lat)**2 + (df["lon"] - lon)**2)**0.5
             df = df.sort_values("dist")
 
-            # ================= CLOSEST PER DATE =================
             df = df.groupby("date").first().reset_index()
 
-            print("Rows after grouping:", len(df))
+            all_data.append(df[["date", param]])
 
-            df = df[["date", param]]
-
-            all_data.append(df)
-
-        # ================= FINAL =================
-        if len(all_data) == 0:
-            print("\n❌ FINAL RESULT: EMPTY")
+        if not all_data:
             return []
 
         final_df = pd.concat(all_data)
         final_df = final_df.sort_values("date")
 
-        final_df["date"] = final_df["date"].astype(str)
-
-        print("\n✅ FINAL ROWS:", len(final_df))
+        # 🔥 format date properly
+        final_df["date"] = final_df["date"].dt.strftime("%Y-%m-%d")
 
         return final_df.to_dict(orient="records")
 
     except Exception as e:
-        print("\n❌ ERROR:", str(e))
         return {"error": str(e)}
