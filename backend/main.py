@@ -1,98 +1,145 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import glob
 import os
 
 app = FastAPI()
 
 # ================= CORS =================
-from fastapi.middleware.cors import CORSMiddleware
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # 🔥 TEMP FIX (most reliable)
-    allow_credentials=False,
+    allow_origins=["*"],  # allow GitHub Pages frontend
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ================= PATH =================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 # ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API is running"}
+    return {"message": "Weather API is running ✅"}
+
+# ================= DEBUG =================
+@app.get("/debug")
+def debug():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    return {
+        "base_dir": base_dir,
+        "folders": os.listdir(base_dir)
+    }
 
 # ================= WEATHER API =================
 @app.get("/weather")
 def get_weather(
-    param: str,
-    lat: float,
-    lon: float,
-    start: str,
-    end: str,
-    monthly: bool = False   # 🔥 NEW
+    param: str = Query(...),
+    lat: float = Query(...),
+    lon: float = Query(...),
+    start: str = Query(...),
+    end: str = Query(...)
 ):
     try:
-        param = param.lower()
+        # -------------------------
+        # Convert dates
+        # -------------------------
+        start_date = pd.to_datetime(start, errors="coerce")
+        end_date = pd.to_datetime(end, errors="coerce")
 
-        start_date = pd.to_datetime(start)
-        end_date = pd.to_datetime(end)
+        if pd.isna(start_date) or pd.isna(end_date):
+            return {"error": "Invalid date format"}
 
-        folder_path = os.path.join(BASE_DIR, param)
+        # -------------------------
+        # Correct path (IMPORTANT)
+        # -------------------------
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.join(base_dir, param)   # backend/rain, backend/tmin...
 
-        # 🔥 SPEED FIX: only load required years
-        start_year = start_date.year
-        end_year = end_date.year
+        if not os.path.exists(data_dir):
+            return {"error": f"{param} folder not found"}
 
-        files = [
-            os.path.join(folder_path, f"{year}_{param}.parquet")
-            for year in range(start_year, end_year + 1)
-            if os.path.exists(os.path.join(folder_path, f"{year}_{param}.parquet"))
-        ]
+        # -------------------------
+        # Get files
+        # -------------------------
+        files = glob.glob(os.path.join(data_dir, f"*_{param}.parquet"))
 
-        if not files:
+        if len(files) == 0:
             return {"error": f"No files found for {param}"}
 
         all_data = []
 
+        # -------------------------
+        # Loop files
+        # -------------------------
         for file in files:
-            df = pd.read_parquet(file)
+            try:
+                print(f"Reading: {file}")
 
-            df.columns = [c.lower() for c in df.columns]
+                # 🔥 MEMORY SAFE READ
+                df = pd.read_parquet(
+                    file,
+                    columns=["date", "lat", "lon", param]
+                )
 
-            if not {"date", "lat", "lon", param}.issubset(df.columns):
+                # -------------------------
+                # Clean data
+                # -------------------------
+                df["date"] = pd.to_datetime(df["date"], errors="coerce")
+                df = df.dropna(subset=["date", param])
+
+                # -------------------------
+                # Filter by date EARLY
+                # -------------------------
+                df = df[
+                    (df["date"] >= start_date) &
+                    (df["date"] <= end_date)
+                ]
+
+                if df.empty:
+                    continue
+
+                # -------------------------
+                # Distance calculation
+                # -------------------------
+                df["dist"] = (
+                    (df["lat"] - lat) ** 2 +
+                    (df["lon"] - lon) ** 2
+                )
+
+                # -------------------------
+                # Closest grid per date
+                # -------------------------
+                df = df.sort_values("dist")
+                df = df.groupby("date").first().reset_index()
+
+                # -------------------------
+                # Keep required columns
+                # -------------------------
+                df = df[["date", param]]
+
+                all_data.append(df)
+
+            except Exception as file_err:
+                print(f"Error reading {file}: {file_err}")
                 continue
 
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
-
-            df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
-
-            if df.empty:
-                continue
-
-            # nearest grid
-            df["dist"] = ((df["lat"] - lat)**2 + (df["lon"] - lon)**2)**0.5
-            df = df.loc[df.groupby("date")["dist"].idxmin()]
-
-            all_data.append(df[["date", param]])
-
-        if not all_data:
+        # -------------------------
+        # No data case
+        # -------------------------
+        if len(all_data) == 0:
             return []
 
-        final_df = pd.concat(all_data).sort_values("date")
+        # -------------------------
+        # Combine all
+        # -------------------------
+        final_df = pd.concat(all_data)
+        final_df = final_df.sort_values("date")
 
-        # 🔥 MONTHLY AGGREGATION
-        if monthly:
-            final_df["month"] = final_df["date"].dt.to_period("M")
-            final_df = final_df.groupby("month")[param].mean().reset_index()
-            final_df["date"] = final_df["month"].astype(str)
-            final_df = final_df.drop(columns=["month"])
-        else:
-            final_df["date"] = final_df["date"].dt.strftime("%Y-%m-%d")
-
+        # -------------------------
+        # Convert to JSON
+        # -------------------------
         return final_df.to_dict(orient="records")
 
     except Exception as e:
+        print("MAIN ERROR:", str(e))
         return {"error": str(e)}
