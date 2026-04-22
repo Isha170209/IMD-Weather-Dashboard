@@ -36,10 +36,10 @@ def get_weather(
         end_date = pd.to_datetime(end, errors="coerce")
 
         if pd.isna(start_date) or pd.isna(end_date):
-            return {"error": "Invalid date"}
+            return {"error": "Invalid date format"}
 
         # -------------------------
-        # Path setup
+        # Setup path
         # -------------------------
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, param)
@@ -48,29 +48,32 @@ def get_weather(
             return {"error": f"{param} folder not found"}
 
         # -------------------------
-        # Select ONLY required years
+        # Select only required years
         # -------------------------
         files = []
         for year in range(start_date.year, end_date.year + 1):
-            f = os.path.join(data_dir, f"{year}_{param}.parquet")
-            if os.path.exists(f):
-                files.append(f)
+            file_path = os.path.join(data_dir, f"{year}_{param}.parquet")
+            if os.path.exists(file_path):
+                files.append(file_path)
 
         if not files:
             return []
 
         # -------------------------
-        # VERY IMPORTANT: small bounding box
+        # MEMORY CONTROL SETTINGS
         # -------------------------
-        LAT_BUFFER = 0.5   # reduce further for stability
-        LON_BUFFER = 0.5
+        LAT_BUFFER = 0.25   # tighter buffer → less data
+        LON_BUFFER = 0.25
+        MAX_ROWS = 50000    # hard safety cap
 
         results = []
 
         for file in files:
             try:
+                print(f"Reading: {file}")
+
                 # -------------------------
-                # Read only needed columns
+                # Read minimal columns only
                 # -------------------------
                 df = pd.read_parquet(
                     file,
@@ -91,10 +94,14 @@ def get_weather(
                     continue
 
                 # -------------------------
+                # 🔥 HARD LIMIT (prevents crash)
+                # -------------------------
+                df = df.head(MAX_ROWS)
+
+                # -------------------------
                 # Date filter
                 # -------------------------
                 df["date"] = pd.to_datetime(df["date"], errors="coerce")
-
                 df = df[
                     (df["date"] >= start_date) &
                     (df["date"] <= end_date)
@@ -104,7 +111,7 @@ def get_weather(
                     continue
 
                 # -------------------------
-                # Find nearest point
+                # Nearest grid selection
                 # -------------------------
                 df["dist"] = (
                     (df["lat"] - lat) ** 2 +
@@ -112,22 +119,25 @@ def get_weather(
                 )
 
                 df = df.sort_values("dist")
-
                 df = df.groupby("date").first().reset_index()
 
                 results.append(df[["date", param]])
 
-            except Exception as e:
-                print("File error:", file, e)
+            except Exception as file_error:
+                print(f"Error reading {file}: {file_error}")
                 continue
 
         if not results:
             return []
 
-        final_df = pd.concat(results).sort_values("date")
+        # -------------------------
+        # Combine results
+        # -------------------------
+        final_df = pd.concat(results)
+        final_df = final_df.sort_values("date")
 
         return final_df.to_dict(orient="records")
 
     except Exception as e:
-        print("MAIN ERROR:", e)
+        print("MAIN ERROR:", str(e))
         return {"error": str(e)}
