@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
-import glob
 import os
 
 app = FastAPI()
@@ -9,7 +8,7 @@ app = FastAPI()
 # ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow GitHub Pages frontend
+    allow_origins=["*"],   # allow GitHub Pages frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,7 +26,7 @@ def debug():
 
     return {
         "base_dir": base_dir,
-        "folders": os.listdir(base_dir)
+        "available_folders": os.listdir(base_dir)
     }
 
 # ================= WEATHER API =================
@@ -41,7 +40,7 @@ def get_weather(
 ):
     try:
         # -------------------------
-        # Convert dates
+        # Convert dates safely
         # -------------------------
         start_date = pd.to_datetime(start, errors="coerce")
         end_date = pd.to_datetime(end, errors="coerce")
@@ -50,18 +49,24 @@ def get_weather(
             return {"error": "Invalid date format"}
 
         # -------------------------
-        # Correct path (IMPORTANT)
+        # Set correct data path
         # -------------------------
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(base_dir, param)   # backend/rain, backend/tmin...
+        data_dir = os.path.join(base_dir, param)   # backend/rain etc.
 
         if not os.path.exists(data_dir):
             return {"error": f"{param} folder not found"}
 
         # -------------------------
-        # Get files
+        # Load ONLY required years
         # -------------------------
-        files = glob.glob(os.path.join(data_dir, f"*_{param}.parquet"))
+        years = list(range(start_date.year, end_date.year + 1))
+
+        files = []
+        for y in years:
+            file_path = os.path.join(data_dir, f"{y}_{param}.parquet")
+            if os.path.exists(file_path):
+                files.append(file_path)
 
         if len(files) == 0:
             return {"error": f"No files found for {param}"}
@@ -69,13 +74,13 @@ def get_weather(
         all_data = []
 
         # -------------------------
-        # Loop files
+        # Process files safely
         # -------------------------
         for file in files:
             try:
                 print(f"Reading: {file}")
 
-                # 🔥 MEMORY SAFE READ
+                # 🔥 Read only required columns (memory optimized)
                 df = pd.read_parquet(
                     file,
                     columns=["date", "lat", "lon", param]
@@ -88,7 +93,7 @@ def get_weather(
                 df = df.dropna(subset=["date", param])
 
                 # -------------------------
-                # Filter by date EARLY
+                # Filter by date (early)
                 # -------------------------
                 df = df[
                     (df["date"] >= start_date) &
@@ -120,7 +125,7 @@ def get_weather(
                 all_data.append(df)
 
             except Exception as file_err:
-                print(f"Error reading {file}: {file_err}")
+                print(f"Error in file {file}: {file_err}")
                 continue
 
         # -------------------------
@@ -130,13 +135,13 @@ def get_weather(
             return []
 
         # -------------------------
-        # Combine all
+        # Combine results
         # -------------------------
         final_df = pd.concat(all_data)
         final_df = final_df.sort_values("date")
 
         # -------------------------
-        # Convert to JSON
+        # Return JSON
         # -------------------------
         return final_df.to_dict(orient="records")
 
