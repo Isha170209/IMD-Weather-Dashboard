@@ -15,7 +15,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ================= CONFIG =================
 DATA_DIR = "data"
 
 
@@ -38,44 +37,44 @@ def get_weather(
         start_date = pd.to_datetime(start)
         end_date = pd.to_datetime(end)
 
-        # ✅ FIX: correct recursive file search
+        # ✅ FIX: correct file search
         file_pattern = os.path.join(DATA_DIR, param, f"*_{param}.parquet")
         files = sorted(glob.glob(file_pattern))
 
-        print("FILES FOUND:", files)   # DEBUG (important)
+        print("FILES FOUND:", files)
 
-        if len(files) == 0:
+        if not files:
             return []
 
-        all_data = []
+        result = []
 
         for file in files:
 
             df = pd.read_parquet(file)
 
-            # ✅ safe date parsing
+            # ================= FIX DATE =================
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
             df = df.dropna(subset=["date"])
 
-            # filter dates
+            # ================= FILTER DATE =================
             df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
             if df.empty:
                 continue
 
-            # nearest grid logic
-            df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
+            # ================= SAFE GRID MATCH =================
+            df["dist"] = (df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2
             df = df.sort_values("dist")
 
-            # one record per date
-            df = df.groupby("date").first().reset_index()
+            # take closest grid ONLY
+            df = df.head(1)
 
-            all_data.append(df[["date", param]])
+            result.append(df[["date", param]])
 
-        if not all_data:
+        if not result:
             return []
 
-        final_df = pd.concat(all_data)
+        final_df = pd.concat(result)
         final_df = final_df.sort_values("date")
 
         return final_df.to_dict(orient="records")
