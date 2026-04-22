@@ -30,24 +30,60 @@ async function fetchSingle(){
 
     if(!data.length) return alert("No data");
 
-    // TABLE
+    // ================= UNIT =================
+    let unit = "";
+    if(param === "rain") unit = "mm";
+    if(param === "tmin" || param === "tmax") unit = "°C";
+
+    // ================= FORMAT DATE =================
+    function formatDate(d){
+        let dt = new Date(d);
+        return `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`;
+    }
+
+    // ================= VALUES =================
+    let values = data.map(d => d[param]);
+
+    let avg = (values.reduce((a,b)=>a+b,0) / values.length).toFixed(2);
+    let min = Math.min(...values).toFixed(2);
+    let max = Math.max(...values).toFixed(2);
+    let sum = values.reduce((a,b)=>a+b,0).toFixed(2);
+
+    // ================= METRICS TABLE =================
+    let metricsHTML = `
+    <h3>Summary Metrics</h3>
+    <table>
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td>Average</td><td>${avg} ${unit}</td></tr>
+        <tr><td>Minimum</td><td>${min} ${unit}</td></tr>
+        <tr><td>Maximum</td><td>${max} ${unit}</td></tr>
+        ${param === "rain" ? `<tr><td>Sum</td><td>${sum} ${unit}</td></tr>` : ""}
+    </table>
+    `;
+
+    document.getElementById("metrics").innerHTML = metricsHTML;
+
+    // ================= DAILY TABLE =================
     let html = "<table><tr><th>Date</th><th>Value</th></tr>";
+
     data.forEach(d=>{
-        html += `<tr><td>${d.date}</td><td>${d[param]}</td></tr>`;
+        html += `<tr><td>${formatDate(d.date)}</td><td>${d[param]} ${unit}</td></tr>`;
     });
+
     html += "</table>";
     document.getElementById("table").innerHTML = html;
 
-    // CHART
+    // ================= CHART =================
     if(chartInstance) chartInstance.destroy();
 
     chartInstance = new Chart(document.getElementById("chart"), {
         type:"line",
         data:{
-            labels: data.map(d=>d.date),
+            labels: data.map(d => formatDate(d.date)),
             datasets:[{
-                label:param,
-                data:data.map(d=>d[param])
+                label: `${param} (${unit})`,
+                data: values,
+                borderWidth: 2
             }]
         }
     });
