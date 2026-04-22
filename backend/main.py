@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import glob
 import os
-import numpy as np
 
 app = FastAPI()
 
@@ -19,13 +18,11 @@ app.add_middleware(
 # ================= CONFIG =================
 DATA_DIR = "data"
 
+
 # ================= ROOT =================
 @app.get("/")
 def home():
-    return {
-        "status": "Weather API running",
-        "endpoints": ["/weather"]
-    }
+    return {"message": "Weather API running"}
 
 # ================= WEATHER API =================
 @app.get("/weather")
@@ -41,50 +38,45 @@ def get_weather(
         start_date = pd.to_datetime(start)
         end_date = pd.to_datetime(end)
 
-        folder = os.path.join(DATA_DIR, param)
+        # ✅ FIX: correct recursive file search
+        file_pattern = os.path.join(DATA_DIR, param, f"*_{param}.parquet")
+        files = sorted(glob.glob(file_pattern))
 
-        # FIX: correct file pattern
-        files = glob.glob(os.path.join(folder, "*.parquet"))
+        print("FILES FOUND:", files)   # DEBUG (important)
 
-        if not files:
+        if len(files) == 0:
             return []
 
-        result = []
+        all_data = []
 
         for file in files:
+
             df = pd.read_parquet(file)
 
-            if df.empty:
-                continue
+            # ✅ safe date parsing
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"])
 
-            # safety checks
-            if "date" not in df.columns:
-                continue
-
-            df["date"] = pd.to_datetime(df["date"])
-
-            # filter time
+            # filter dates
             df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
             if df.empty:
                 continue
 
-            # nearest grid
-            df["dist"] = np.sqrt((df["lat"] - lat)**2 + (df["lon"] - lon)**2)
+            # nearest grid logic
+            df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
             df = df.sort_values("dist")
 
-            df = df.groupby("date", as_index=False).first()
+            # one record per date
+            df = df.groupby("date").first().reset_index()
 
-            result.append(df[["date", param]])
+            all_data.append(df[["date", param]])
 
-        if not result:
+        if not all_data:
             return []
 
-        final_df = pd.concat(result)
+        final_df = pd.concat(all_data)
         final_df = final_df.sort_values("date")
-
-        # IMPORTANT: JSON-safe date format
-        final_df["date"] = final_df["date"].astype(str)
 
         return final_df.to_dict(orient="records")
 
