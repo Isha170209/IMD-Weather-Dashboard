@@ -52,9 +52,9 @@ async function fetchData() {
 
         console.log("API Response:", data);
 
-        // ✅ FIX: ensure array
         if (!Array.isArray(data) || data.length === 0) {
             status.innerText = "No data found";
+            extractedData = [];
             return;
         }
 
@@ -79,6 +79,7 @@ async function fetchData() {
 
 // ================= TABLE =================
 function renderTable() {
+
     let html = "<table><tr><th>Date</th><th>Value</th></tr>";
 
     extractedData.forEach(r => {
@@ -110,10 +111,10 @@ function renderChart() {
     });
 }
 
-// ================= CSV =================
+// ================= DOWNLOAD =================
 function downloadCSV() {
 
-    if (extractedData.length === 0) return;
+    if (!extractedData.length) return;
 
     let csv = "date,value\n";
 
