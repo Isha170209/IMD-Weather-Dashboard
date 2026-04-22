@@ -8,7 +8,7 @@ app = FastAPI()
 # ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # allow GitHub Pages
+    allow_origins=["*"],   # allow GitHub Pages frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,7 +39,7 @@ def get_weather(
             return {"error": "Invalid date format"}
 
         # -------------------------
-        # Setup path
+        # Path setup
         # -------------------------
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, param)
@@ -48,7 +48,7 @@ def get_weather(
             return {"error": f"{param} folder not found"}
 
         # -------------------------
-        # Select only required years
+        # Load only required year files
         # -------------------------
         files = []
         for year in range(start_date.year, end_date.year + 1):
@@ -60,11 +60,16 @@ def get_weather(
             return []
 
         # -------------------------
-        # MEMORY CONTROL SETTINGS
+        # 🔥 PARAM-SPECIFIC OPTIMIZATION
         # -------------------------
-        LAT_BUFFER = 0.25   # tighter buffer → less data
-        LON_BUFFER = 0.25
-        MAX_ROWS = 50000    # hard safety cap
+        if param == "rain":
+            LAT_BUFFER = 0.1
+            LON_BUFFER = 0.1
+            MAX_ROWS = 20000
+        else:
+            LAT_BUFFER = 0.25
+            LON_BUFFER = 0.25
+            MAX_ROWS = 50000
 
         results = []
 
@@ -73,7 +78,7 @@ def get_weather(
                 print(f"Reading: {file}")
 
                 # -------------------------
-                # Read minimal columns only
+                # Read minimal columns
                 # -------------------------
                 df = pd.read_parquet(
                     file,
@@ -102,6 +107,7 @@ def get_weather(
                 # Date filter
                 # -------------------------
                 df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
                 df = df[
                     (df["date"] >= start_date) &
                     (df["date"] <= end_date)
@@ -111,7 +117,7 @@ def get_weather(
                     continue
 
                 # -------------------------
-                # Nearest grid selection
+                # Nearest grid point
                 # -------------------------
                 df["dist"] = (
                     (df["lat"] - lat) ** 2 +
@@ -127,6 +133,9 @@ def get_weather(
                 print(f"Error reading {file}: {file_error}")
                 continue
 
+        # -------------------------
+        # No data case
+        # -------------------------
         if not results:
             return []
 
