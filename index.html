@@ -3,120 +3,45 @@
 <head>
 <meta charset="utf-8" />
 <title>IMD Weather Dashboard</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
 
-<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
-body {
-  margin:0;
-  font-family:Arial;
-  overflow:hidden; /* ❌ no scroll */
-}
+body { margin:0; font-family:Arial; }
 
 header {
   background:#b30000;
   color:white;
-  padding:10px 18px;
+  padding:15px;
+  text-align:center;
 }
 
-header h1 {
-  margin:0;
-  font-size:28px;
-}
-
-/* HOME */
-#homePage {
-  padding:30px;
-}
+.section { display:none; padding:20px; }
+.active { display:block; }
 
 .grid {
   display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px,1fr));
+  grid-template-columns:repeat(2,1fr);
   gap:20px;
 }
 
 .card {
+  padding:40px;
   background:#f5f5f5;
-  padding:30px;
-  border-radius:10px;
-  cursor:pointer;
-  font-size:18px;
   text-align:center;
+  cursor:pointer;
+  border-radius:10px;
+  font-size:18px;
 }
 
-.card:hover {
-  background:#b30000;
-  color:white;
-}
+.card:hover { background:#ffe6e6; }
 
-/* DASHBOARD */
-#dashboardPage {
-  display:none;
-}
-
-#controls {
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  padding:10px;
-}
-
-.filterTab {
-  background:white;
-  padding:8px;
-  border-radius:6px;
-  min-width:150px;
-}
-
-.tabTitle {
-  font-size:14px;
-  font-weight:bold;
-}
-
-input, select {
-  width:100%;
-}
+#map { height:60vh; }
 
 button {
-  margin-top:5px;
-  padding:5px;
-}
-
-.btn-red { background:#b30000; color:white; }
-.btn-white { background:white; border:1px solid #b30000; }
-
-/* OUTPUT */
-#output {
-  display:flex;
-  flex-direction:column;
-  height:calc(100vh - 120px);
-}
-
-#chartContainer {
-  height:40%;
-}
-
-#tablesContainer {
-  display:flex;
-  gap:10px;
-  height:60%;
-}
-
-.tableBox {
-  flex:1;
-  overflow:auto;
-}
-
-table {
-  width:100%;
-  border-collapse:collapse;
-}
-
-th, td {
-  border:1px solid #ccc;
-  padding:4px;
-  font-size:12px;
+  padding:8px;
+  margin:5px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -127,84 +52,84 @@ th, td {
 <h1>IMD Weather Dashboard</h1>
 </header>
 
-<!-- HOME -->
-<div id="homePage">
-<h2>Select Functionality</h2>
-
+<!-- ================= HOME ================= -->
+<div id="home" class="section active">
 <div class="grid">
-<div class="card" onclick="openDashboard()">Download IMD Gridded Data (Single Location)</div>
-<div class="card" onclick="openDashboard()">Download IMD Gridded Data (Multiple Locations)</div>
-<div class="card" onclick="openDashboard()">View IMD Gridded Data (On Map)</div>
-<div class="card" onclick="openDashboard()">Download Realtime IMD Gridded Data</div>
+<div class="card" onclick="showSection('single')">Single Location</div>
+<div class="card" onclick="showSection('multi')">Multiple Locations</div>
+<div class="card" onclick="showSection('mapSection')">View on Map</div>
+<div class="card" onclick="showSection('realtime')">Realtime Data</div>
 </div>
 </div>
 
-<!-- DASHBOARD -->
-<div id="dashboardPage">
+<!-- ================= SINGLE ================= -->
+<div id="single" class="section">
 
-<button onclick="goHome()" class="btn-white">⬅ Back</button>
+<h2>Single Location</h2>
 
-<div id="controls">
-
-<div class="filterTab">
-<div class="tabTitle">Parameter</div>
+Param:
 <select id="param">
 <option value="rain">rain</option>
 <option value="tmin">tmin</option>
 <option value="tmax">tmax</option>
 </select>
-</div>
 
-<div class="filterTab">
-<div class="tabTitle">Latitude</div>
-<input type="number" id="lat">
-</div>
+Lat: <input id="lat">
+Lon: <input id="lon">
+Start: <input type="date" id="start">
+End: <input type="date" id="end">
 
-<div class="filterTab">
-<div class="tabTitle">Longitude</div>
-<input type="number" id="lon">
-</div>
+<button onclick="fetchSingle()">Fetch</button>
+<button onclick="showSection('home')">Back</button>
 
-<div class="filterTab">
-<div class="tabTitle">Start</div>
-<input type="date" id="startDate">
-</div>
-
-<div class="filterTab">
-<div class="tabTitle">End</div>
-<input type="date" id="endDate">
-</div>
-
-<div class="filterTab">
-<div class="tabTitle">Action</div>
-<button id="submitBtn" class="btn-red">Submit</button>
-<button id="resetBtn" class="btn-white">Reset</button>
-<button id="downloadBtn" class="btn-red">CSV</button>
-</div>
-
-</div>
-
-<!-- OUTPUT -->
-<div id="output">
-
-<div id="chartContainer">
 <canvas id="chart"></canvas>
-</div>
-
-<div id="tablesContainer">
-
-<div class="tableBox" id="dailyTable"></div>
-
-<div class="tableBox" id="summaryTable"></div>
+<div id="table"></div>
 
 </div>
 
+<!-- ================= MAP ================= -->
+<div id="mapSection" class="section">
+
+<h2>Map View</h2>
+
+Lat: <input id="mapLat">
+Lon: <input id="mapLon">
+Date: <input type="date" id="mapDate">
+
+<select id="mapParam">
+<option value="rain">rain</option>
+<option value="tmin">tmin</option>
+<option value="tmax">tmax</option>
+</select>
+
+<button onclick="loadMap()">Show</button>
+<button onclick="showSection('home')">Back</button>
+
+<div id="map"></div>
+
 </div>
 
+<!-- ================= MULTI ================= -->
+<div id="multi" class="section">
+
+<h2>Upload CSV (lat,lon)</h2>
+
+<input type="file" id="csvFile">
+<button onclick="processCSV()">Process</button>
+<button onclick="showSection('home')">Back</button>
+
+</div>
+
+<!-- ================= REALTIME ================= -->
+<div id="realtime" class="section">
+<h2>Coming Soon 🚀</h2>
+<button onclick="showSection('home')">Back</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="./app.js" type="module"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script src="app.js"></script>
 
 </body>
 </html>
