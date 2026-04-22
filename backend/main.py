@@ -3,26 +3,29 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import glob
 import os
+import numpy as np
 
 app = FastAPI()
 
 # ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for frontend (GitHub Pages)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ================= CONFIG =================
-DATA_DIR = "data"  # keep parquet files in this folder
+DATA_DIR = "data"
 
-
-# ================= ROOT CHECK =================
+# ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API is running"}
+    return {
+        "status": "Weather API running",
+        "endpoints": ["/weather"]
+    }
 
 # ================= WEATHER API =================
 @app.get("/weather")
@@ -38,42 +41,51 @@ def get_weather(
         start_date = pd.to_datetime(start)
         end_date = pd.to_datetime(end)
 
-        file_pattern = os.path.join(DATA_DIR, param, f"*{param}.parquet")
-        files = glob.glob(file_pattern)
+        folder = os.path.join(DATA_DIR, param)
 
-        if len(files) == 0:
-            return {"error": "No parquet files found"}
+        # FIX: correct file pattern
+        files = glob.glob(os.path.join(folder, "*.parquet"))
 
-        all_data = []
+        if not files:
+            return []
+
+        result = []
 
         for file in files:
             df = pd.read_parquet(file)
 
-            # ensure correct format
+            if df.empty:
+                continue
+
+            # safety checks
+            if "date" not in df.columns:
+                continue
+
             df["date"] = pd.to_datetime(df["date"])
 
-            # filter date range
+            # filter time
             df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
             if df.empty:
                 continue
 
-            # nearest grid selection
-            df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
+            # nearest grid
+            df["dist"] = np.sqrt((df["lat"] - lat)**2 + (df["lon"] - lon)**2)
             df = df.sort_values("dist")
 
-            # keep closest grid point per date
-            df = df.groupby("date").first().reset_index()
+            df = df.groupby("date", as_index=False).first()
 
-            all_data.append(df[["date", param]])
+            result.append(df[["date", param]])
 
-        if len(all_data) == 0:
+        if not result:
             return []
 
-        final_df = pd.concat(all_data)
+        final_df = pd.concat(result)
         final_df = final_df.sort_values("date")
 
-        # convert to JSON
+        # IMPORTANT: JSON-safe date format
+        final_df["date"] = final_df["date"].astype(str)
+
         return final_df.to_dict(orient="records")
 
     except Exception as e:
