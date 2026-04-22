@@ -45,7 +45,8 @@ async function fetchData() {
 
     try {
 
-        const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
+        const url =
+            `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -114,7 +115,10 @@ function renderChart() {
 // ================= DOWNLOAD =================
 function downloadCSV() {
 
-    if (!extractedData.length) return;
+    if (extractedData.length === 0) {
+        alert("No data");
+        return;
+    }
 
     let csv = "date,value\n";
 
