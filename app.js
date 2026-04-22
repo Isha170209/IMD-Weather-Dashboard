@@ -1,6 +1,5 @@
 console.log("App started ✅");
 
-// 🔥 YOUR BACKEND URL
 const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
 
 let extractedData = [];
@@ -39,21 +38,21 @@ async function fetchData() {
     const startDate = document.getElementById("startDate").value;
     const endDate = document.getElementById("endDate").value;
 
+    const monthly = document.getElementById("monthlyToggle").checked;
+
     if (isNaN(lat) || isNaN(lon)) {
         alert("Enter valid lat/lon");
         return;
     }
 
     try {
-        const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
+        const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}&monthly=${monthly}`;
 
         console.log("Calling API:", url);
 
         const res = await fetch(url);
 
-        if (!res.ok) {
-            throw new Error("API error");
-        }
+        if (!res.ok) throw new Error("API error");
 
         const data = await res.json();
 
@@ -72,7 +71,7 @@ async function fetchData() {
         status.innerText = `Loaded ${extractedData.length} records`;
 
         renderTable();
-        renderChart();
+        renderChart(param);
 
         markersLayer.clearLayers();
         L.marker([lat, lon]).addTo(markersLayer);
@@ -98,7 +97,7 @@ function renderTable() {
 }
 
 // ================= CHART =================
-function renderChart() {
+function renderChart(param) {
 
     const ctx = document.getElementById("chart");
 
@@ -109,7 +108,7 @@ function renderChart() {
         data: {
             labels: extractedData.map(d => d.date),
             datasets: [{
-                label: "Value",
+                label: param.toUpperCase(),   // 🔥 FIXED
                 data: extractedData.map(d => d.value),
                 borderWidth: 2
             }]
