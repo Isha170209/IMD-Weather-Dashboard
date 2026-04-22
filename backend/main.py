@@ -15,13 +15,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATA_DIR = "data"
+# ================= FIXED PATH =================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")   # IMPORTANT FIX
+
+print("DATA DIR:", DATA_DIR)
 
 
 # ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API running"}
+    return {"message": "Weather API is running"}
 
 # ================= WEATHER API =================
 @app.get("/weather")
@@ -37,44 +41,51 @@ def get_weather(
         start_date = pd.to_datetime(start)
         end_date = pd.to_datetime(end)
 
-        # ✅ FIX: correct file search
-        file_pattern = os.path.join(DATA_DIR, param, f"*_{param}.parquet")
-        files = sorted(glob.glob(file_pattern))
+        folder = os.path.join(DATA_DIR, param)
 
-        print("FILES FOUND:", files)
+        # ✅ FIX: correct file search
+        files = glob.glob(os.path.join(folder, "*.parquet"))
 
         if not files:
             return []
 
-        result = []
+        all_data = []
 
         for file in files:
+            try:
+                df = pd.read_parquet(file)
 
-            df = pd.read_parquet(file)
+                if "date" not in df.columns:
+                    continue
 
-            # ================= FIX DATE =================
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
-            df = df.dropna(subset=["date"])
+                df["date"] = pd.to_datetime(df["date"])
 
-            # ================= FILTER DATE =================
-            df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
+                # date filter
+                df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
-            if df.empty:
+                if df.empty:
+                    continue
+
+                # nearest grid
+                df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
+                df = df.sort_values("dist")
+
+                df = df.groupby("date").first().reset_index()
+
+                # keep only required columns
+                if param in df.columns:
+                    all_data.append(df[["date", param]])
+                else:
+                    continue
+
+            except Exception as e:
+                print("File error:", file, e)
                 continue
 
-            # ================= SAFE GRID MATCH =================
-            df["dist"] = (df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2
-            df = df.sort_values("dist")
-
-            # take closest grid ONLY
-            df = df.head(1)
-
-            result.append(df[["date", param]])
-
-        if not result:
+        if not all_data:
             return []
 
-        final_df = pd.concat(result)
+        final_df = pd.concat(all_data)
         final_df = final_df.sort_values("date")
 
         return final_df.to_dict(orient="records")
