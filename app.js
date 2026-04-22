@@ -7,6 +7,21 @@ let chartInstance = null;
 let map;
 let markersLayer;
 
+// ================= PAGE NAVIGATION =================
+window.openDashboard = function () {
+    document.getElementById("homePage").style.display = "none";
+    document.getElementById("dashboardPage").style.display = "block";
+
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 200);
+};
+
+window.goHome = function () {
+    document.getElementById("dashboardPage").style.display = "none";
+    document.getElementById("homePage").style.display = "block";
+};
+
 // ================= INIT =================
 window.addEventListener("DOMContentLoaded", () => {
 
@@ -46,6 +61,7 @@ async function fetchData() {
     }
 
     try {
+
         const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}&monthly=${monthly}`;
 
         console.log("Calling API:", url);
@@ -108,7 +124,7 @@ function renderChart(param) {
         data: {
             labels: extractedData.map(d => d.date),
             datasets: [{
-                label: param.toUpperCase(),   // 🔥 FIXED
+                label: param.toUpperCase(),
                 data: extractedData.map(d => d.value),
                 borderWidth: 2
             }]
