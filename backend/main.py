@@ -1,12 +1,11 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
-import glob
 import os
-import re
 
 app = FastAPI()
 
+# ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,83 +14,88 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = "data"
+# ================= CONFIG =================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
+
+# ================= ROOT =================
 @app.get("/")
 def home():
-    return {"message": "Weather API running"}
+    return {"message": "Weather API running ✅"}
 
-# ================= MAIN API =================
+
+# ================= WEATHER API =================
 @app.get("/weather")
-def weather(
-    param: str = Query(...),   # rain / tmin / tmax
+def get_weather(
+    param: str = Query(...),
     lat: float = Query(...),
     lon: float = Query(...),
     start: str = Query(...),
     end: str = Query(...)
 ):
-
     try:
         start_date = pd.to_datetime(start)
         end_date = pd.to_datetime(end)
 
-        folder = os.path.join(BASE_DIR, param)
+        # 🔥 determine years to load
+        years = range(start_date.year, end_date.year + 1)
 
-        # get only relevant files
-        files = glob.glob(os.path.join(folder, f"*_{param}.parquet"))
+        all_data = []
 
-        print("FILES FOUND:", files)
+        for year in years:
 
-        if not files:
-            return []
+            file_path = os.path.join(
+                DATA_DIR,
+                param,
+                f"{year}_{param}.parquet"
+            )
 
-        result = []
+            print(f"Checking file: {file_path}")
 
-        for file in files:
-
-            # 🔥 extract year from filename (IMPORTANT FIX)
-            match = re.search(r"(\d{4})", file)
-            if not match:
+            if not os.path.exists(file_path):
+                print("File not found:", file_path)
                 continue
 
-            year = int(match.group(1))
+            # 🔥 read parquet
+            df = pd.read_parquet(file_path)
 
-            # skip files outside date range years
-            if year < start_date.year or year > end_date.year:
-                continue
-
-            df = pd.read_parquet(file)
-
-            # normalize columns
-            df.columns = [c.strip().lower() for c in df.columns]
-
-            if "date" not in df.columns or param not in df.columns:
-                continue
-
+            # ensure datetime
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+            # drop invalid dates
             df = df.dropna(subset=["date"])
 
-            # filter by full date range
+            # 🔥 filter date range
             df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
 
             if df.empty:
+                print("No data in range for:", year)
                 continue
 
-            # nearest grid point logic
+            # 🔥 nearest grid point
             df["dist"] = ((df["lat"] - lat) ** 2 + (df["lon"] - lon) ** 2) ** 0.5
 
+            # 🔥 closest per date
             df = df.sort_values("dist")
-            df = df.groupby("date", as_index=False).first()
+            df = df.groupby("date").first().reset_index()
 
-            result.append(df[["date", param]])
+            # keep only required columns
+            df = df[["date", param]]
 
-        if not result:
+            all_data.append(df)
+
+        if len(all_data) == 0:
             return []
 
-        final_df = pd.concat(result)
+        final_df = pd.concat(all_data)
         final_df = final_df.sort_values("date")
+
+        # convert to string for JSON
+        final_df["date"] = final_df["date"].dt.strftime("%Y-%m-%d")
 
         return final_df.to_dict(orient="records")
 
     except Exception as e:
+        print("ERROR:", str(e))
         return {"error": str(e)}
