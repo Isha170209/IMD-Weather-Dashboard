@@ -34,6 +34,7 @@ async function fetchData() {
     const param = document.getElementById("param").value;
     const lat = parseFloat(document.getElementById("lat").value);
     const lon = parseFloat(document.getElementById("lon").value);
+
     const startDate = document.getElementById("startDate").value;
     const endDate = document.getElementById("endDate").value;
 
@@ -47,16 +48,11 @@ async function fetchData() {
         const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
 
         const res = await fetch(url);
-
-        if (!res.ok) {
-            status.innerText = "Backend error";
-            return;
-        }
-
         const data = await res.json();
 
         console.log("API Response:", data);
 
+        // ✅ FIX: ensure array
         if (!Array.isArray(data) || data.length === 0) {
             status.innerText = "No data found";
             return;
@@ -83,7 +79,6 @@ async function fetchData() {
 
 // ================= TABLE =================
 function renderTable() {
-
     let html = "<table><tr><th>Date</th><th>Value</th></tr>";
 
     extractedData.forEach(r => {
@@ -118,10 +113,7 @@ function renderChart() {
 // ================= CSV =================
 function downloadCSV() {
 
-    if (extractedData.length === 0) {
-        alert("No data");
-        return;
-    }
+    if (extractedData.length === 0) return;
 
     let csv = "date,value\n";
 
