@@ -1,6 +1,5 @@
 console.log("App started ✅");
 
-// 🔥 YOUR BACKEND URL
 const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
 
 let extractedData = [];
@@ -26,7 +25,7 @@ window.addEventListener("DOMContentLoaded", () => {
     console.log("Buttons working ✅");
 });
 
-// ================= FETCH FROM BACKEND =================
+// ================= FETCH =================
 async function fetchData() {
 
     const status = document.getElementById("status");
@@ -35,7 +34,6 @@ async function fetchData() {
     const param = document.getElementById("param").value;
     const lat = parseFloat(document.getElementById("lat").value);
     const lon = parseFloat(document.getElementById("lon").value);
-
     const startDate = document.getElementById("startDate").value;
     const endDate = document.getElementById("endDate").value;
 
@@ -49,6 +47,12 @@ async function fetchData() {
         const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
 
         const res = await fetch(url);
+
+        if (!res.ok) {
+            status.innerText = "Backend error";
+            return;
+        }
+
         const data = await res.json();
 
         console.log("API Response:", data);
@@ -58,10 +62,9 @@ async function fetchData() {
             return;
         }
 
-        // normalize backend response
         extractedData = data.map(d => ({
             date: d.date,
-            value: d[param] !== undefined ? d[param] : d.value
+            value: d[param] ?? d.value
         }));
 
         status.innerText = `Loaded ${extractedData.length} records`;
@@ -112,7 +115,7 @@ function renderChart() {
     });
 }
 
-// ================= CSV DOWNLOAD =================
+// ================= CSV =================
 function downloadCSV() {
 
     if (extractedData.length === 0) {
