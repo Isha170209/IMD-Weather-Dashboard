@@ -5,15 +5,29 @@ const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
 let extractedData = [];
 let chartInstance = null;
 
+// ================= DOM ELEMENTS =================
+const paramEl = document.getElementById("param");
+const latEl = document.getElementById("lat");
+const lonEl = document.getElementById("lon");
+const startDateEl = document.getElementById("startDate");
+const endDateEl = document.getElementById("endDate");
+
+const submitBtn = document.getElementById("submitBtn");
+const resetBtn = document.getElementById("resetBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+
+const dailyTable = document.getElementById("dailyTable");
+const summaryTable = document.getElementById("summaryTable");
+
 // ================= PAGE =================
 window.openDashboard = function () {
-    homePage.style.display = "none";
-    dashboardPage.style.display = "block";
+    document.getElementById("homePage").style.display = "none";
+    document.getElementById("dashboardPage").style.display = "block";
 };
 
 window.goHome = function () {
-    dashboardPage.style.display = "none";
-    homePage.style.display = "block";
+    document.getElementById("dashboardPage").style.display = "none";
+    document.getElementById("homePage").style.display = "block";
 };
 
 // ================= INIT =================
@@ -21,6 +35,8 @@ window.addEventListener("DOMContentLoaded", () => {
     submitBtn.addEventListener("click", fetchData);
     resetBtn.addEventListener("click", resetForm);
     downloadBtn.addEventListener("click", downloadCSV);
+
+    console.log("Buttons working ✅");
 });
 
 // ================= FETCH =================
@@ -30,27 +46,45 @@ async function fetchData() {
     const lat = parseFloat(latEl.value);
     const lon = parseFloat(lonEl.value);
 
-    const start = startDate.value;
-    const end = endDate.value;
+    const start = startDateEl.value;
+    const end = endDateEl.value;
 
-    const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${start}&end=${end}`;
-
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!Array.isArray(data) || data.length === 0) {
-        alert("No data");
+    if (isNaN(lat) || isNaN(lon)) {
+        alert("Enter valid lat/lon");
         return;
     }
 
-    extractedData = data.map(d => ({
-        date: d.date,
-        value: d[param]
-    }));
+    const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${start}&end=${end}`;
 
-    renderChart(param);
-    renderDailyTable(param);
-    renderSummary(param);
+    console.log("Calling API:", url);
+
+    try {
+        const res = await fetch(url);
+
+        if (!res.ok) throw new Error("API error");
+
+        const data = await res.json();
+
+        console.log("API Response:", data);
+
+        if (!Array.isArray(data) || data.length === 0) {
+            alert("No data");
+            return;
+        }
+
+        extractedData = data.map(d => ({
+            date: d.date,
+            value: d[param]
+        }));
+
+        renderChart(param);
+        renderDailyTable(param);
+        renderSummary(param);
+
+    } catch (err) {
+        console.error(err);
+        alert("Error loading data");
+    }
 }
 
 // ================= CHART =================
@@ -99,16 +133,16 @@ function renderSummary(param) {
     const sum = values.reduce((a,b)=>a+b,0);
 
     let html = `<table>
-    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><th>Metric</th><th>${getUnitLabel(param)}</th></tr>
     <tr><td>Average</td><td>${avg}</td></tr>
     <tr><td>Max</td><td>${max}</td></tr>
     <tr><td>Min</td><td>${min}</td></tr>`;
 
     if (param === "rain") {
-        html += `<tr><td>Sum</td><td>${sum}</td></tr>`;
+        html += `<tr><td>Total Rainfall</td><td>${sum}</td></tr>`;
     }
 
-    html += `</table>`;
+    html += "</table>";
 
     summaryTable.innerHTML = html;
 }
@@ -122,6 +156,11 @@ function getUnitLabel(param) {
 // ================= CSV =================
 function downloadCSV() {
 
+    if (extractedData.length === 0) {
+        alert("No data");
+        return;
+    }
+
     let csv = "date,value\n";
 
     extractedData.forEach(r => {
@@ -130,6 +169,7 @@ function downloadCSV() {
 
     const blob = new Blob([csv]);
     const a = document.createElement("a");
+
     a.href = URL.createObjectURL(blob);
     a.download = "weather.csv";
     a.click();
@@ -138,7 +178,14 @@ function downloadCSV() {
 // ================= RESET =================
 function resetForm() {
     extractedData = [];
-    chartInstance?.destroy();
+
+    if (chartInstance) chartInstance.destroy();
+
     dailyTable.innerHTML = "";
     summaryTable.innerHTML = "";
+
+    latEl.value = "";
+    lonEl.value = "";
+    startDateEl.value = "";
+    endDateEl.value = "";
 }
