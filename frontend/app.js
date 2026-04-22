@@ -1,6 +1,6 @@
 console.log("App started ✅");
 
-// 🔥 CHANGE THIS after deployment
+// 🔥 YOUR BACKEND URL
 const API_BASE = "https://weather-dashboard-9dn4.onrender.com";
 
 let extractedData = [];
@@ -45,20 +45,24 @@ async function fetchData() {
     }
 
     try {
+
         const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
 
         const res = await fetch(url);
         const data = await res.json();
 
-        extractedData = data.map(d => ({
-            date: d.date,
-            value: d[param] ?? d.value
-        }));
+        console.log("API Response:", data);
 
-        if (extractedData.length === 0) {
+        if (!Array.isArray(data) || data.length === 0) {
             status.innerText = "No data found";
             return;
         }
+
+        // normalize backend response
+        extractedData = data.map(d => ({
+            date: d.date,
+            value: d[param] !== undefined ? d[param] : d.value
+        }));
 
         status.innerText = `Loaded ${extractedData.length} records`;
 
