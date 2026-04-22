@@ -1,16 +1,14 @@
-import * as arrow from "https://cdn.jsdelivr.net/npm/apache-arrow@latest/+esm";
-
 console.log("App started ✅");
 
-const username = "Isha170209";
-const repo = "Weather-Dashboard";
+// 🔥 CHANGE THIS after deployment
+const API_BASE = "https://YOUR-BACKEND.onrender.com";
 
 let extractedData = [];
 let chartInstance = null;
 let map;
 let markersLayer;
 
-// 🔷 INIT
+// ================= INIT =================
 window.addEventListener("DOMContentLoaded", () => {
 
     map = L.map('map').setView([22, 78], 5);
@@ -28,7 +26,7 @@ window.addEventListener("DOMContentLoaded", () => {
     console.log("Buttons working ✅");
 });
 
-// 🔷 FETCH DATA (PARQUET via Apache Arrow)
+// ================= FETCH FROM BACKEND =================
 async function fetchData() {
 
     const status = document.getElementById("status");
@@ -38,94 +36,45 @@ async function fetchData() {
     const lat = parseFloat(document.getElementById("lat").value);
     const lon = parseFloat(document.getElementById("lon").value);
 
-    const startDate = new Date(document.getElementById("startDate").value);
-    const endDate = new Date(document.getElementById("endDate").value);
+    const startDate = document.getElementById("startDate").value;
+    const endDate = document.getElementById("endDate").value;
 
     if (isNaN(lat) || isNaN(lon)) {
         alert("Enter valid lat/lon");
         return;
     }
 
-    extractedData = [];
-    markersLayer.clearLayers();
+    try {
+        const url = `${API_BASE}/weather?param=${param}&lat=${lat}&lon=${lon}&start=${startDate}&end=${endDate}`;
 
-    for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
+        const res = await fetch(url);
+        const data = await res.json();
 
-        const url = `https://raw.githubusercontent.com/${username}/${repo}/main/data/${param}/${year}_${param}.parquet`;
+        extractedData = data.map(d => ({
+            date: d.date,
+            value: d[param] ?? d.value
+        }));
 
-        console.log("Fetching:", url);
-
-        try {
-            const res = await fetch(url);
-
-            if (!res.ok) {
-                console.log("File not found:", url);
-                continue;
-            }
-
-            const buffer = await res.arrayBuffer();
-
-            // 🔥 Read parquet (Arrow-compatible)
-            const table = await arrow.tableFromIPC(buffer);
-
-            console.log("Rows:", table.numRows);
-
-            const dateCol = table.getChild("date");
-            const latCol = table.getChild("lat");
-            const lonCol = table.getChild("lon");
-            const valCol = table.getChild(param);
-
-            const grouped = {};
-
-            for (let i = 0; i < table.numRows; i++) {
-
-                const date = dateCol.get(i);
-                const lat2 = latCol.get(i);
-                const lon2 = lonCol.get(i);
-                const value = valCol.get(i);
-
-                if (!date || value == null) continue;
-
-                const d = new Date(date);
-                if (d < startDate || d > endDate) continue;
-
-                const dist = Math.sqrt(
-                    (lat2 - lat) ** 2 +
-                    (lon2 - lon) ** 2
-                );
-
-                if (!grouped[date] || dist < grouped[date].dist) {
-                    grouped[date] = {
-                        date,
-                        value,
-                        dist
-                    };
-                }
-            }
-
-            Object.values(grouped).forEach(v => extractedData.push(v));
-
-        } catch (err) {
-            console.error("Error reading:", url, err);
+        if (extractedData.length === 0) {
+            status.innerText = "No data found";
+            return;
         }
+
+        status.innerText = `Loaded ${extractedData.length} records`;
+
+        renderTable();
+        renderChart();
+
+        markersLayer.clearLayers();
+        L.marker([lat, lon]).addTo(markersLayer);
+
+    } catch (err) {
+        console.error(err);
+        status.innerText = "Error loading data";
     }
-
-    if (extractedData.length === 0) {
-        status.innerText = "No data found";
-        return;
-    }
-
-    extractedData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    status.innerText = `Loaded ${extractedData.length} records`;
-
-    renderTable();
-    renderChart();
-
-    L.marker([lat, lon]).addTo(markersLayer);
 }
 
-// 🔷 TABLE
+// ================= TABLE =================
 function renderTable() {
 
     let html = "<table><tr><th>Date</th><th>Value</th></tr>";
@@ -139,7 +88,7 @@ function renderTable() {
     document.getElementById("table").innerHTML = html;
 }
 
-// 🔷 CHART
+// ================= CHART =================
 function renderChart() {
 
     const ctx = document.getElementById("chart");
@@ -159,7 +108,7 @@ function renderChart() {
     });
 }
 
-// 🔷 CSV DOWNLOAD
+// ================= CSV DOWNLOAD =================
 function downloadCSV() {
 
     if (extractedData.length === 0) {
@@ -181,7 +130,7 @@ function downloadCSV() {
     a.click();
 }
 
-// 🔷 RESET
+// ================= RESET =================
 function resetForm() {
 
     document.getElementById("lat").value = "";
