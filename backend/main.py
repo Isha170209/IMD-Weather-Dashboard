@@ -6,13 +6,12 @@ import os
 app = FastAPI()
 
 # ================= CORS =================
+from fastapi.middleware.cors import CORSMiddleware
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://isha170209.github.io",
-        "http://localhost:5500"
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],   # 🔥 TEMP FIX (most reliable)
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
